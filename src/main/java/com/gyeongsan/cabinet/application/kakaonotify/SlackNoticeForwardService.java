@@ -10,6 +10,7 @@ import com.gyeongsan.cabinet.domain.kakaonotify.model.KakaoMessage;
 import com.gyeongsan.cabinet.domain.kakaonotify.model.KakaoNotificationException;
 import com.gyeongsan.cabinet.domain.kakaonotify.model.KakaoRecipient;
 import com.gyeongsan.cabinet.domain.kakaonotify.model.KakaoRefreshedToken;
+import com.gyeongsan.cabinet.domain.kakaonotify.model.NoticeSummaryException;
 import com.gyeongsan.cabinet.domain.kakaonotify.model.TokenDecryptionException;
 import com.gyeongsan.cabinet.domain.kakaonotify.port.in.ForwardSlackNoticesUseCase;
 import com.gyeongsan.cabinet.domain.kakaonotify.port.out.KakaoConsentRepositoryPort;
@@ -415,9 +416,38 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
             log.warn(
                     "[SlackNotice] 공지 요약에 실패해 자르기로 대체합니다 - ts: {}, 원인: {}",
                     message.ts(),
-                    e.getClass().getSimpleName());
+                    failureReason(e));
             return Optional.empty();
         }
+    }
+
+    /** 로그에 남기는 실패 원인의 최대 길이. */
+    private static final int MAX_REASON_LENGTH = 200;
+
+    /**
+     * 요약 실패 원인을 로그용 문자열로 만든다. 원인 파악(예: "Gemini 응답 상태 429")에 필요한 메시지를 남기되, 안전하게 통제된 것만 쓴다.
+     *
+     * <ul>
+     *   <li>{@link NoticeSummaryException}: 요약기 어댑터가 만든 고정 문구(상태 코드, 예외 클래스명 등)라 메시지를 함께 남긴다. 어댑터는
+     *       응답 본문·키·요청 URL·헤더를 메시지에 담지 않는다.
+     *   <li>그 밖의 예외: 메시지에 무엇이 들어 있을지 보장할 수 없으므로(라이브러리가 URL 등을 담을 수 있음) 클래스명만 남긴다.
+     * </ul>
+     *
+     * 스택 트레이스와 cause 는 남기지 않는다(cause 메시지에 요청 URL 이 있을 수 있음). 줄바꿈은 공백으로 바꾸고 길이를 제한한다.
+     */
+    static String failureReason(RuntimeException e) {
+        String type = e.getClass().getSimpleName();
+        if (!(e instanceof NoticeSummaryException) || e.getMessage() == null) {
+            return type;
+        }
+        String detail = e.getMessage().replaceAll("\\s+", " ").strip();
+        if (detail.isEmpty()) {
+            return type;
+        }
+        if (detail.codePointCount(0, detail.length()) > MAX_REASON_LENGTH) {
+            detail = detail.substring(0, detail.offsetByCodePoints(0, MAX_REASON_LENGTH - 1)) + "…";
+        }
+        return type + ": " + detail;
     }
 
     /**

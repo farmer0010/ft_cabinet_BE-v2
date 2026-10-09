@@ -348,6 +348,77 @@ class SlackNoticeSummaryTest {
         assertThat(cursor.store).containsEntry(CHANNEL, "1700000100.000100");
     }
 
+    private ILoggingEvent onlySummaryWarn() {
+        List<ILoggingEvent> warns =
+                appender.list.stream()
+                        .filter(
+                                e ->
+                                        e.getLevel() == Level.WARN
+                                                && e.getFormattedMessage().contains("공지 요약에 실패"))
+                        .toList();
+        assertThat(warns).hasSize(1);
+        return warns.get(0);
+    }
+
+    @Test
+    @DisplayName("요약 실패 WARN 에 원인 메시지(예: 응답 상태 429)가 함께 남고, 스택 트레이스는 남지 않는다")
+    void failureLogIncludesReasonMessage() {
+        summarizer.failure = new NoticeSummaryException("Gemini 응답 상태 429");
+        post(ORIGINAL_SECRET + "가".repeat(300), 0);
+
+        service.forwardNewNotices();
+
+        ILoggingEvent warn = onlySummaryWarn();
+        assertThat(warn.getFormattedMessage())
+                .contains("NoticeSummaryException: Gemini 응답 상태 429")
+                .doesNotContain(ORIGINAL_SECRET);
+        assertThat(warn.getThrowableProxy()).as("cause 메시지에 URL 이 있을 수 있어 스택은 남기지 않는다").isNull();
+    }
+
+    @Test
+    @DisplayName("요약기 고유 예외가 아닌 예외는 메시지에 무엇이 들어 있을지 몰라 클래스명만 남긴다")
+    void unknownExceptionMessageIsNotLogged() {
+        summarizer.failure =
+                new IllegalStateException(
+                        "POST https://generativelanguage.googleapis.com/v1beta/models/x:generateContent?key=LEAKED-KEY "
+                                + ORIGINAL_SECRET);
+        post("가".repeat(300), 0);
+
+        service.forwardNewNotices();
+
+        String log = onlySummaryWarn().getFormattedMessage();
+        assertThat(log).contains("IllegalStateException");
+        assertThat(log)
+                .doesNotContain("LEAKED-KEY", "googleapis", ORIGINAL_SECRET, "generateContent");
+    }
+
+    @Test
+    @DisplayName("원인 메시지는 줄바꿈이 공백으로 바뀌고 길이가 제한된다")
+    void reasonIsSingleLineAndCapped() {
+        assertThat(
+                        SlackNoticeForwardService.failureReason(
+                                new NoticeSummaryException("첫 줄\n둘째 줄\r\n  셋째")))
+                .isEqualTo("NoticeSummaryException: 첫 줄 둘째 줄 셋째");
+
+        String reason =
+                SlackNoticeForwardService.failureReason(
+                        new NoticeSummaryException("가".repeat(500)));
+        String detail = reason.substring("NoticeSummaryException: ".length());
+        assertThat(cp(detail)).isEqualTo(200);
+        assertThat(detail).endsWith("…");
+    }
+
+    @Test
+    @DisplayName("원인 메시지가 없거나 비어 있으면 클래스명만 남긴다")
+    void emptyMessageFallsBackToClassName() {
+        assertThat(SlackNoticeForwardService.failureReason(new NoticeSummaryException(null)))
+                .isEqualTo("NoticeSummaryException");
+        assertThat(SlackNoticeForwardService.failureReason(new NoticeSummaryException("  \n ")))
+                .isEqualTo("NoticeSummaryException");
+        assertThat(SlackNoticeForwardService.failureReason(new IllegalArgumentException("x")))
+                .isEqualTo("IllegalArgumentException");
+    }
+
     private static String legacyTruncate(String text) {
         return SlackMrkdwn.truncate(text, KakaoMessage.MAX_TEXT_LENGTH);
     }

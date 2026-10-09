@@ -50,7 +50,7 @@ public class SlackNoticeConfig {
     public NoticeSummarizerPort noticeSummarizerPort(
             @Value("${app.slack-notice.summary.enabled:false}") boolean enabled,
             @Value("${app.slack-notice.summary.api-key:}") String apiKey,
-            @Value("${app.slack-notice.summary.model:gemini-3.8-flash}") String model,
+            @Value("${app.slack-notice.summary.model:gemini-3.6-flash}") String model,
             @Value("${app.slack-notice.summary.thinking-level:low}") String thinkingLevel,
             @Value("${app.slack-notice.summary.base-url:https://generativelanguage.googleapis.com}")
                     String baseUrl,

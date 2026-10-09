@@ -194,7 +194,7 @@ app:
     summary:
       enabled: ${SLACK_NOTICE_SUMMARY_ENABLED:false}
       api-key: ${GEMINI_API_KEY:}
-      model: ${SLACK_NOTICE_SUMMARY_MODEL:gemini-3.8-flash}
+      model: ${SLACK_NOTICE_SUMMARY_MODEL:gemini-3.6-flash}
       # 생각(thinking) 수준. Gemini 3.x 계열은 thinkingLevel(low/medium/high)을 쓴다. 비우면 보내지 않는다(모델 기본값).
       thinking-level: ${SLACK_NOTICE_SUMMARY_THINKING_LEVEL:low}
       timeout: ${SLACK_NOTICE_SUMMARY_TIMEOUT:8s}
