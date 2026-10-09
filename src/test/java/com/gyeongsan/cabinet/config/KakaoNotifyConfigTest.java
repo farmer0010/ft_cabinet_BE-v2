@@ -274,7 +274,7 @@ class KakaoNotifyConfigTest {
     }
 
     @Test
-    @DisplayName("요약을 켜고 키를 주면 Gemini 요약기가 만들어지고, 기본 모델은 gemini-3.8-flash 이며 toString 에 키가 없다")
+    @DisplayName("요약을 켜고 키를 주면 Gemini 요약기가 만들어지고, 기본 모델은 gemini-3.6-flash 이며 toString 에 키가 없다")
     void summaryEnabledWithKey() {
         noticeRunner()
                 .withPropertyValues(
@@ -285,7 +285,7 @@ class KakaoNotifyConfigTest {
                             NoticeSummarizerPort port = context.getBean(NoticeSummarizerPort.class);
                             assertThat(port).isInstanceOf(GeminiNoticeSummarizerAdapter.class);
                             assertThat(port.toString())
-                                    .contains("gemini-3.8-flash")
+                                    .contains("gemini-3.6-flash")
                                     .doesNotContain("test-key-do-not-leak");
                             Object model =
                                     org.springframework.test.util.ReflectionTestUtils.getField(
@@ -296,7 +296,7 @@ class KakaoNotifyConfigTest {
                             Object thinking =
                                     org.springframework.test.util.ReflectionTestUtils.getField(
                                             port, "thinkingLevel");
-                            assertThat(model).isEqualTo("gemini-3.8-flash");
+                            assertThat(model).isEqualTo("gemini-3.6-flash");
                             assertThat(timeout).isEqualTo(java.time.Duration.ofSeconds(8));
                             assertThat(thinking).isEqualTo("low");
                         });
