@@ -29,7 +29,7 @@ V2~V6 어디에도 `IF NOT EXISTS` / `IF EXISTS` 가 없다. 그래서 "일부�
 
 ## 3. 운영 영향 (락 범위)
 
-- **테이블 재구성은 없다.** 기존 테이블을 바꾸는 문장은 `user` 의 `ADD COLUMN` 두 개(V4, V6)와 V3(새 테이블)뿐이고, `user` 두 개는 INSTANT 로 실행됨을 확인했다(`mysql:8.0` 은 8.0.12 이상, MariaDB 10.3 이상 필요). 나머지는 모두 새 테이블 `CREATE TABLE` 이다.
+- **테이블 재구성은 없다.** 기존 테이블을 바꾸는 문장은 `user` 의 `ADD COLUMN` 두 개(V4, V6)와 V3(새 테이블)뿐이고, `user` 두 개는 INSTANT 로 실행됨을 확인했다(MariaDB 10.3 이상 또는 MySQL 8.0.12 이상 필요. 리허설은 `mariadb:10.6` 과 `mysql:8.0` 에서 모두 통과). 나머지는 모두 새 테이블 `CREATE TABLE` 이다.
 - 그래도 **ALTER 는 `user` 의 메타데이터 락을 잡아야 한다.** 오래 열린 트랜잭션이 `user` 를 쥐고 있으면 ALTER 가 기다리고, 그동안 `user` 를 읽으려는 **새 요청도 줄 서서 막힌다**(리허설 5). 서비스가 멈춘 것처럼 보일 수 있으므로 적용 전 확인과 `lock_wait_timeout` 이 필요하다.
 - V6 의 `kakao_notify_consent` 는 `user(id)` 를 참조하는 FK 를 만든다. 짧은 공유 메타데이터 락이면 충분하다.
 - 운영 `user` 행 수는 이 환경에서 알 수 없다. 체크리스트 2단계에서 확인한다.
@@ -39,11 +39,11 @@ V2~V6 어디에도 `IF NOT EXISTS` / `IF EXISTS` 가 없다. 그래서 "일부�
 
 **권장 방식: 앱이 부팅하며 마이그레이션하게 두지 말고, 배포 전에 사람이 `flyway migrate` 를 먼저 실행한다.** 앱 부팅 중 실패하면 새 이미지가 뜨지 못한 채 재시작을 반복하고, 실패한 마이그레이션이 남아 계속 거부되기 때문이다. 미리 적용해 두면 새 이미지는 할 일이 없다.
 
-`<...>` 는 자리표시자다. 비밀번호는 셸 히스토리에 남지 않게 환경변수로만 넘긴다(`export FLYWAY_PASSWORD=...` 을 대화형으로 입력).
+`<...>` 는 자리표시자다. **접속 URL 은 앱과 같은 `jdbc:mariadb://` 를 쓴다**(앱은 MariaDB 드라이버로 접속하고 리허설도 이 URL 로 돌렸다). 서버가 MySQL 이고 Flyway CLI 에서 이 드라이버를 못 찾으면 `jdbc:mysql://<host>:3306/cabi` 로 바꿔도 된다(`FLYWAY_BASELINE.md` 의 예시가 이 형식이다). 비밀번호는 셸 히스토리에 남지 않게 환경변수로만 넘긴다(`export FLYWAY_PASSWORD=...` 을 대화형으로 입력).
 
 1. **사전 확인 (읽기 전용)**
    ```sql
-   SELECT VERSION();                                              -- MySQL 8.0.12+ 인지 (INSTANT 가능)
+   SELECT VERSION();                                              -- MariaDB 10.3+ 또는 MySQL 8.0.12+ 여야 INSTANT 가능 (운영 DB 종류도 여기서 확인)
    SELECT COUNT(*) FROM `user`;                                   -- 행 수 (재구성 없음이지만 규모 파악)
    SHOW TABLES LIKE 'faq%';  SHOW TABLES LIKE 'kakao_notify%';    -- 빈 결과여야 함 (충돌하는 테이블 없음)
    SHOW COLUMNS FROM `user` LIKE 'kakao_alarm';                   -- 빈 결과여야 함
@@ -60,13 +60,13 @@ V2~V6 어디에도 `IF NOT EXISTS` / `IF EXISTS` 가 없다. 그래서 "일부�
    수 초 넘게 열린 트랜잭션이 보이면 끝나기를 기다리거나 원인을 먼저 확인한다.
 5. **상태 확인**
    ```bash
-   flyway -url="jdbc:mysql://<host>:3306/cabi" -user=<user> \
+   flyway -url="jdbc:mariadb://<host>:3306/cabi" -user=<user> \
           -locations=filesystem:src/main/resources/db/migration info
    ```
    V1 `Baseline`, V2~V6 `Pending` 이어야 한다.
 6. **적용** (메타데이터 락을 무한정 기다리지 않게 세션 타임아웃을 건다)
    ```bash
-   flyway -url="jdbc:mysql://<host>:3306/cabi" -user=<user> \
+   flyway -url="jdbc:mariadb://<host>:3306/cabi" -user=<user> \
           -locations=filesystem:src/main/resources/db/migration \
           -initSql="SET SESSION lock_wait_timeout=10" \
           migrate
