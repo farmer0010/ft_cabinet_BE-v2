@@ -1071,7 +1071,13 @@ docker-compose up -d --build
 * **Prometheus:** `http://localhost:9090`
 
 ### 4. 테스트 계정 정보 (Test Accounts)
-`data.sql`을 통해 초기 데이터가 로드됩니다. 관리자 권한이 필요한 경우 DB에서 직접 `role`을 `ADMIN`으로 변경하거나 초기 데이터를 확인하세요.
+`src/main/resources/data.sql` 은 더 이상 jar/이미지에 포함되지 않습니다(실제 재학생 데이터가 들어 있어 배포물에서 제외). 로컬/데모 스택의 초기 데이터는 **가짜 데이터만 담은** `scripts/db/seed/demo-seed.sql` 로 넣습니다.
+
+```bash
+# 스키마가 있어야 합니다(FLYWAY_ENABLED=true 로 앱을 띄우면 Flyway 가 만듭니다). 여러 번 실행해도 안전, 운영/공유 DB 에는 금지
+docker exec -i <mariadb 컨테이너> mysql -u<유저> -p<비밀번호> <DB> < scripts/db/seed/demo-seed.sql
+```
+시드에는 `demo-admin`(ADMIN), 일반 유저 `demo-user-01/02`, 피시너 `demo-piscine-01` 과 사물함 90개가 들어 있습니다. 로그인은 실제 42 OAuth 로 하므로, 본인 인트라 ID 를 관리자로 쓰려면 DB 에서 직접 `role` 을 `ADMIN` 으로 바꾸세요.
 
 > **Tip:** 로그인 후 `/v4/admin/users/{your_intra_id}/coin` API를 통해 코인을 추가로 지급받아 상점 기능을 테스트해볼 수 있습니다.
 

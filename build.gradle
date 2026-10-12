@@ -89,6 +89,30 @@ tasks.named('test') {
 	finalizedBy 'jacocoTestReport'
 }
 
+// 실제 재학생 인트라 ID 가 들어 있는 시드(src/main/resources/data.sql)는 어떤 산출물에도 넣지 않는다.
+// 이 파일은 jar 와 공개 컨테이너 이미지에 그대로 실려 나갔다(감사 H-5). 클래스패스(jar, bootRun)에서 빼고,
+// 테스트는 src/test/resources/data.sql(가짜 데이터), 로컬/데모는 scripts/db/seed/demo-seed.sql(가짜 데이터)을 쓴다.
+// 파일을 저장소에서 어떻게 제거할지(히스토리 포함 여부)는 별도로 결정한다.
+processResources {
+	exclude 'data.sql'
+}
+
+// 위 제외가 풀리거나 다른 경로로 들어오면 빌드가 실패하도록, 만들어진 jar 안을 직접 검사한다.
+def assertNoSeedData = { File archive ->
+	new java.util.zip.ZipFile(archive).withCloseable { zip ->
+		def leaked = zip.entries().toList().findAll { it.name == 'data.sql' || it.name.endsWith('/data.sql') }
+		if (!leaked.isEmpty()) {
+			throw new GradleException("${archive.name} 에 시드 파일이 들어 있습니다: ${leaked*.name}. 실제 인트라 ID 가 배포물에 실리면 안 됩니다.")
+		}
+	}
+}
+tasks.named('bootJar') {
+	doLast { assertNoSeedData(archiveFile.get().asFile) }
+}
+tasks.named('jar') {
+	doLast { assertNoSeedData(archiveFile.get().asFile) }
+}
+
 spotless {
 	java {
 		target '**/*.java'
