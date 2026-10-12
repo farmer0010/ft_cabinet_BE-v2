@@ -11,3 +11,11 @@ spring:
       hibernate:
         show_sql: false
         format_sql: false
+
+# 운영에서는 API 문서(Swagger UI, OpenAPI JSON)를 열지 않는다. 비로그인 사용자에게 관리자 API를 포함한 전체 구조가 노출되기 때문이다.
+# 기본 프로필(application.yml)은 개발 편의를 위해 켜 둔다. 비활성화된 경로는 404 가 된다.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
