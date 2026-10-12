@@ -1071,7 +1071,7 @@ docker-compose up -d --build
 * **Prometheus:** `http://localhost:9090`
 
 ### 4. 테스트 계정 정보 (Test Accounts)
-`src/main/resources/data.sql` 은 더 이상 jar/이미지에 포함되지 않습니다(실제 재학생 데이터가 들어 있어 배포물에서 제외). 로컬/데모 스택의 초기 데이터는 **가짜 데이터만 담은** `scripts/db/seed/demo-seed.sql` 로 넣습니다.
+`src/main/resources/data.sql` 은 더 이상 저장소에서 추적하지 않고 jar/이미지에도 포함되지 않습니다(실제 재학생 데이터가 들어 있어 제외, `.gitignore` 에 등록). 로컬/데모 스택의 초기 데이터는 **가짜 데이터만 담은** `scripts/db/seed/demo-seed.sql` 로 넣습니다.
 
 ```bash
 # 스키마가 있어야 합니다(FLYWAY_ENABLED=true 로 앱을 띄우면 Flyway 가 만듭니다). 여러 번 실행해도 안전, 운영/공유 DB 에는 금지

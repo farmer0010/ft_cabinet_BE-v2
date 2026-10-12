@@ -59,7 +59,7 @@ redis_data/
 backups/
 
 # 실제 재학생 인트라 ID 가 들어 있는 시드. 배포물(jar, 이미지)에는 build.gradle 의 processResources 가 싣지 않는다.
-# 주의: 이미 추적 중인 파일이라 이 규칙만으로는 추적이 풀리지 않는다 (git rm --cached 가 필요하고, 제거 방식은 별도 결정 대기).
+# 이 파일은 git 추적에서 제거됐다(git rm --cached). 로컬에 남겨 두더라도 이 규칙 때문에 다시 커밋되지 않는다.
 # 가짜 데이터만 담은 시드(src/test/resources/data.sql, scripts/db/seed/*.sql)는 추적한다.
 src/main/resources/data.sql
 
