@@ -204,8 +204,10 @@ class AdminUndoSnapshotMysqlTest {
                 CabinetRepositoryPort cabinets,
                 LentRepositoryPort lents,
                 UserRepositoryPort users,
-                ReservationPort reservations) {
-            return new AdminUndoService(logs, cabinets, lents, users, reservations);
+                ReservationPort reservations,
+                TransactionTemplate transactionTemplate) {
+            return new AdminUndoService(
+                    logs, cabinets, lents, users, reservations, transactionTemplate);
         }
 
         @Bean
