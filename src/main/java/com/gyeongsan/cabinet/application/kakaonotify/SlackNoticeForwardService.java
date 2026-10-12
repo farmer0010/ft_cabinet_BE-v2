@@ -21,7 +21,9 @@ import com.gyeongsan.cabinet.domain.kakaonotify.port.out.TokenCipherPort;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +39,10 @@ import lombok.extern.log4j.Log4j2;
  *       오래된 공지는 새 수신자에게 쏟아내지 않도록 경고와 함께 건너뛴다.
  *   <li>개별 발송 실패는 로그만 남기고 다음 사람으로 넘어간다. 카카오가 동의 해지({@code invalid_grant}, 발송 시 -402)로 거절하면 그 동의를 해지
  *       처리해 이후 대상에서 뺀다.
+ *   <li><b>커서 전진 규칙</b>(공지 한 건 기준): 한 명이라도 받았으면 전진한다(실패한 사람에게 다시 보내려다 받은 사람에게 중복 발송하지 않으려는 것이며, 못
+ *       받은 사람은 로그만 남는다). 아무도 못 받았는데 실패 중 하나라도 <b>재시도로 풀릴 수 있는</b>(일시) 실패면 전진하지 않고 이후 공지도 보내지 않은 채
+ *       다음 주기에 그 공지부터 다시 시도한다. 실패가 모두 <b>영구</b>(동의 철회·해지, refresh_token 만료 {@code invalid_grant},
+ *       동의 항목 부족 -402)이면 재시도해도 소용없으니 전진한다. 재시도는 {@code maxHoldHours} 가 지나면 건너뛰므로 유한하다.
  *   <li>각 수신자는 발송 직전에 동의/알림 스위치를 다시 확인하고, 한 번의 실행에서는 refresh_token 갱신을 사람당 한 번만 한다.
  *   <li>본문이 카카오 글자 수 제한을 넘을 때만 요약기를 <b>공지 한 건당 한 번</b> 부르고 그 결과를 모든 수신자가 공유한다. 요약이 꺼져 있거나 실패/무효하면
  *       기존 자르기로 폴백하며 발송을 막지 않는다.
@@ -98,12 +104,47 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
                 NoticeSummarizerPort.disabled());
     }
 
+    /** 이 수신자에게 보낼 수 없는 이유. 재시도로 풀릴 수 있는지에 따라 커서 전진 여부가 갈린다. */
+    private enum Failure {
+        NONE,
+        /** 동의 철회·해지, refresh_token 만료(invalid_grant), 동의 항목 부족(-402). 재시도해도 소용없다. */
+        PERMANENT,
+        /** 카카오·네트워크·DB 장애, 복호화 실패(키 문제) 등 나중에 풀릴 수 있는 것. */
+        TRANSIENT
+    }
+
     /** 한 번의 실행 동안 한 수신자의 상태. */
     private static final class Session {
         String accessToken;
         boolean unavailable;
+        Failure failure = Failure.NONE;
         String currentEncryptedToken;
+
+        void fail(Failure kind) {
+            unavailable = true;
+            failure = kind;
+        }
     }
+
+    /** 공지(또는 요약) 한 건을 모든 수신자에게 보낸 결과. */
+    private record SendOutcome(int sent, int transientFailures, int permanentFailures) {
+        /** 아무도 받지 못했고 재시도로 풀릴 수 있는 실패가 있다 - 커서를 옮기지 않고 다음 주기에 다시 시도한다. */
+        boolean mustRetry() {
+            return sent == 0 && transientFailures > 0;
+        }
+    }
+
+    /** 재시도 때 요약(외부 호출)과 퍼머링크 조회를 되풀이하지 않도록 만든 메시지를 잠시 기억한다. */
+    private static final int PREPARED_CACHE_SIZE = 20;
+
+    private final Map<String, KakaoMessage> prepared =
+            Collections.synchronizedMap(
+                    new LinkedHashMap<>() {
+                        @Override
+                        protected boolean removeEldestEntry(Map.Entry<String, KakaoMessage> e) {
+                            return size() > PREPARED_CACHE_SIZE;
+                        }
+                    });
 
     @Override
     public void forwardNewNotices() {
@@ -161,20 +202,56 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
         Map<Long, Session> sessions = new HashMap<>();
         int sent = 0;
         if (skipped > 0 || (history.truncated() && !fresh.isEmpty())) {
-            sent += sendToAll(recipients, sessions, summaryMessage(skipped, history.truncated()));
+            SendOutcome summary =
+                    sendToAll(recipients, sessions, summaryMessage(skipped, history.truncated()));
+            if (summary.mustRetry()) {
+                logHeld("생략 요약", summary, recipients.size());
+                return;
+            }
+            sent += summary.sent();
+            if (skipped > 0) {
+                // 요약을 받은 사람에게 다음 주기에 요약이 또 가지 않도록, 생략한 공지 바로 앞까지 커서를 옮겨 둔다.
+                saveCursor(channelId, fresh.get(skipped - 1).ts());
+            }
         }
+        int forwarded = 0;
         for (SlackChannelMessage message : toForward) {
-            sent += sendToAll(recipients, sessions, noticeMessage(channelId, message));
+            SendOutcome outcome =
+                    sendToAll(recipients, sessions, preparedNoticeMessage(channelId, message));
+            if (outcome.mustRetry()) {
+                // 이 공지부터 다시 시도하도록 커서를 그대로 두고, 순서가 뒤바뀌지 않게 이후 공지도 보내지 않는다.
+                logHeld("공지 ts=" + message.ts(), outcome, recipients.size());
+                log.info(
+                        "[SlackNotice] 새 글 {}건 확인, {}건 전달 후 보류, 수신자 {}명, 발송 {}건 (생략 {}건)",
+                        all.size(),
+                        forwarded,
+                        recipients.size(),
+                        sent,
+                        skipped);
+                return;
+            }
+            sent += outcome.sent();
+            forwarded++;
             saveCursor(channelId, message.ts());
+            prepared.remove(message.ts());
         }
         saveCursor(channelId, all.get(all.size() - 1).ts());
         log.info(
                 "[SlackNotice] 새 글 {}건 확인, {}건 전달, 수신자 {}명, 발송 {}건 (생략 {}건)",
                 all.size(),
-                toForward.size(),
+                forwarded,
                 recipients.size(),
                 sent,
                 skipped);
+    }
+
+    private void logHeld(String what, SendOutcome outcome, int recipients) {
+        log.warn(
+                "[SlackNotice] {} 을(를) 아무에게도 보내지 못해(일시 실패 {}명, 영구 실패 {}명, 수신자 {}명) 커서를 옮기지 않고 다음 주기에 다시 시도합니다.",
+                what,
+                outcome.transientFailures(),
+                outcome.permanentFailures(),
+                recipients);
     }
 
     private void startFromNow(String channelId) {
@@ -227,33 +304,43 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
         }
     }
 
-    private int sendToAll(
+    private SendOutcome sendToAll(
             List<KakaoRecipient> recipients, Map<Long, Session> sessions, KakaoMessage message) {
         int sent = 0;
+        int transientFailures = 0;
+        int permanentFailures = 0;
         for (KakaoRecipient recipient : recipients) {
             Session session = sessions.computeIfAbsent(recipient.userId(), id -> new Session());
-            if (session.unavailable) {
-                continue;
-            }
-            try {
-                if (session.accessToken == null && !openSession(recipient, session)) {
-                    continue;
+            if (!session.unavailable) {
+                try {
+                    if (session.accessToken != null || openSession(recipient, session)) {
+                        kakao.sendToMe(session.accessToken, message);
+                        sent++;
+                        continue;
+                    }
+                } catch (KakaoInsufficientScopeException e) {
+                    revoke(
+                            recipient.userId(),
+                            session.currentEncryptedToken,
+                            "발송 시 동의 항목 부족(-402)");
+                    session.fail(Failure.PERMANENT);
+                } catch (RuntimeException e) {
+                    // 한 사람의 실패가 다른 사람을 막지 않게 한다. 토큰/본문은 로그에 남기지 않는다.
+                    log.error(
+                            "[SlackNotice] 발송 실패 - userId: {}, 원인: {}",
+                            recipient.userId(),
+                            e.getClass().getSimpleName());
+                    session.fail(Failure.TRANSIENT);
                 }
-                kakao.sendToMe(session.accessToken, message);
-                sent++;
-            } catch (KakaoInsufficientScopeException e) {
-                revoke(recipient.userId(), session.currentEncryptedToken, "발송 시 동의 항목 부족(-402)");
-                session.unavailable = true;
-            } catch (RuntimeException e) {
-                // 한 사람의 실패가 다른 사람을 막지 않게 한다. 토큰/본문은 로그에 남기지 않는다.
-                log.error(
-                        "[SlackNotice] 발송 실패 - userId: {}, 원인: {}",
-                        recipient.userId(),
-                        e.getClass().getSimpleName());
-                session.unavailable = true;
+            }
+            // 이번 실행 앞 단계에서 이미 못 보내게 된 사람도 같은 종류의 실패로 센다.
+            if (session.failure == Failure.PERMANENT) {
+                permanentFailures++;
+            } else {
+                transientFailures++;
             }
         }
-        return sent;
+        return new SendOutcome(sent, transientFailures, permanentFailures);
     }
 
     /**
@@ -268,12 +355,12 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
             current = consentRepository.findActiveRecipient(listed.userId());
         } catch (RuntimeException e) {
             log.warn("[SlackNotice] 수신 상태를 확인하지 못해 건너뜁니다 - userId: {}", listed.userId());
-            session.unavailable = true;
+            session.fail(Failure.TRANSIENT);
             return false;
         }
         if (current.isEmpty()) {
-            // 목록을 읽은 뒤 동의가 해지됐거나 알림을 껐다.
-            session.unavailable = true;
+            // 목록을 읽은 뒤 동의가 해지됐거나 알림을 껐다. 재시도해도 받을 수 없다.
+            session.fail(Failure.PERMANENT);
             return false;
         }
 
@@ -288,7 +375,7 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
             log.error(
                     "[SlackNotice] 토큰을 복호화하지 못해 건너뜁니다(암호화 키가 바뀌었거나 값이 손상됨, 유저가 다시 동의해야 함) - userId: {}",
                     listed.userId());
-            session.unavailable = true;
+            session.fail(Failure.TRANSIENT);
             return false;
         }
 
@@ -297,11 +384,11 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
             refreshed = kakao.refreshAccessToken(refreshToken);
         } catch (KakaoInvalidGrantException e) {
             revoke(listed.userId(), encrypted, "refresh_token invalid_grant(유저가 동의를 해지했거나 토큰 만료)");
-            session.unavailable = true;
+            session.fail(Failure.PERMANENT);
             return false;
         } catch (KakaoNotificationException e) {
             log.warn("[SlackNotice] 토큰 갱신 실패, 이번 실행에서는 건너뜁니다 - userId: {}", listed.userId());
-            session.unavailable = true;
+            session.fail(Failure.TRANSIENT);
             return false;
         }
 
@@ -352,6 +439,17 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
 
     static String context(Long userId) {
         return "kakao-notify:" + userId;
+    }
+
+    /** 같은 공지를 재시도할 때 요약·퍼머링크 조회를 되풀이하지 않는다(Gemini 호출, Slack 호출 절약). */
+    private KakaoMessage preparedNoticeMessage(String channelId, SlackChannelMessage message) {
+        KakaoMessage cached = prepared.get(message.ts());
+        if (cached != null) {
+            return cached;
+        }
+        KakaoMessage built = noticeMessage(channelId, message);
+        prepared.put(message.ts(), built);
+        return built;
     }
 
     private KakaoMessage summaryMessage(int skipped, boolean truncated) {
