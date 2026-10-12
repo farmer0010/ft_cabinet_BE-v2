@@ -1,15 +1,15 @@
 # V2~V6 마이그레이션 리허설 결과와 운영 이행 체크리스트
 
-> 코드/스키마를 바꾸는 문서가 아니라 **검증 보고 + 절차 문서**다. 리허설은 `MigrationRehearsalMysqlTest`(Testcontainers, `mariadb:10.6` 과 `mysql:8.0`)로 실제 DB 에서 돌렸고, 운영 DB 에는 접속하지 않았다. 비밀번호·접속 정보는 이 문서에 쓰지 않는다. 기본 절차는 `FLYWAY_BASELINE.md` 를 따른다.
+> 코드/스키마를 바꾸는 문서가 아니라 **검증 보고 + 절차 문서**다. **운영 DB 는 Azure Database for MySQL 8.0 이다**(Azure MariaDB 서비스 종료로 MySQL 을 쓴다). 리허설은 `MigrationRehearsalMysqlTest`(Testcontainers, 운영과 같은 종류인 `mysql:8.0` 과, 로컬 docker-compose 가 쓰는 `mariadb:10.6`)로 실제 DB 에서 돌렸고, 운영 DB 에는 접속하지 않았다. 비밀번호·접속 정보는 이 문서에 쓰지 않는다. 기본 절차는 `FLYWAY_BASELINE.md` 를 따른다.
 
 ## 1. 리허설로 확인한 것
 
-| # | 시나리오 | 결과 (mariadb:10.6 / mysql:8.0 모두) |
+| # | 시나리오 | 결과 (mysql:8.0 = 운영과 같은 종류, mariadb:10.6 = 로컬 compose 용, 모두 같은 결과) |
 |---|---|---|
 | 1 | 운영 경로: V1 스키마가 이미 있고 데이터가 있는 DB 에 `baseline 1` → `migrate` | **V2~V6 5개만 실행**, V1 미실행, 기존 행 보존, `flyway validate` 통과, 모든 엔티티 `ddl-auto=validate` 통과. 기존 사용자는 `kakao_alarm=0`, `ft_grade=NULL`(일반 취급) |
 | 2 | V5 중간 실패 (같은 이름의 `faq_question` 이 먼저 있어 둘째 CREATE 실패) | `faq` 는 **남는다**(DDL 롤백 불가). 이력에 `5:SQL:0`. 그대로 `migrate` 하면 "failed migration" 으로 거부. `repair` 만 하고 재시도하면 `faq` 가 이미 있어 **또 실패**. 남은 테이블을 지우고 `repair` → `migrate` 하면 V5, V6 가 이어서 적용 |
 | 3 | V6 중간 실패 (같은 이름의 `kakao_notify_consent` 가 먼저 있어 CREATE 실패) | `user.kakao_alarm` 컬럼은 **이미 추가된 채 남는다**. 이력에 `6:SQL:0`. `repair` 만 하고 재시도하면 `Duplicate column name 'kakao_alarm'` 으로 **또 실패**. 컬럼과 남은 테이블을 지우고 `repair` → `migrate` 하면 적용 |
-| 4 | `user` 에 26만 행을 넣고 V4, V6 의 `ADD COLUMN` 을 `ALGORITHM=INSTANT` 로 실행 | 둘 다 성공(테이블 재구성 없음). mariadb:10.6 에서 309ms / 66ms, mysql:8.0 에서 72ms / 60ms |
+| 4 | `user` 에 26만 행을 넣고 V4, V6 의 `ADD COLUMN` 을 `ALGORITHM=INSTANT` 로 실행 | 둘 다 성공(테이블 재구성 없음). mysql:8.0(운영과 같은 종류) 에서 72ms / 60ms, mariadb:10.6(로컬 compose 용) 에서 309ms / 66ms |
 | 5 | 다른 세션이 `user` 를 읽는 트랜잭션을 연 채 `migrate` (`lock_wait_timeout=3`) | ALTER 가 메타데이터 락을 기다리다 약 3.3초 뒤 실패(V4 에서 `4:SQL:0`, 단일 문장이라 **반쯤 적용된 것 없음**). 그 사이 들어온 일반 `SELECT` 도 ALTER 뒤에 줄을 서서 **약 2.3초 막혔다**. 트랜잭션을 닫고 `repair` → `migrate` 하면 정상 적용 |
 
 ## 2. 문장별 재실행 안전성
@@ -29,7 +29,7 @@ V2~V6 어디에도 `IF NOT EXISTS` / `IF EXISTS` 가 없다. 그래서 "일부�
 
 ## 3. 운영 영향 (락 범위)
 
-- **테이블 재구성은 없다.** 기존 테이블을 바꾸는 문장은 `user` 의 `ADD COLUMN` 두 개(V4, V6)와 V3(새 테이블)뿐이고, `user` 두 개는 INSTANT 로 실행됨을 확인했다(MariaDB 10.3 이상 또는 MySQL 8.0.12 이상 필요. 리허설은 `mariadb:10.6` 과 `mysql:8.0` 에서 모두 통과). 나머지는 모두 새 테이블 `CREATE TABLE` 이다.
+- **테이블 재구성은 없다.** 기존 테이블을 바꾸는 문장은 `user` 의 `ADD COLUMN` 두 개(V4, V6)와 V3(새 테이블)뿐이고, `user` 두 개는 INSTANT 로 실행됨을 확인했다(MySQL 8.0.12 이상 필요 — 운영은 8.0 이다. 로컬 compose 의 MariaDB 는 10.3 이상. 리허설은 `mysql:8.0` 과 `mariadb:10.6` 에서 모두 통과). 나머지는 모두 새 테이블 `CREATE TABLE` 이다.
 - 그래도 **ALTER 는 `user` 의 메타데이터 락을 잡아야 한다.** 오래 열린 트랜잭션이 `user` 를 쥐고 있으면 ALTER 가 기다리고, 그동안 `user` 를 읽으려는 **새 요청도 줄 서서 막힌다**(리허설 5). 서비스가 멈춘 것처럼 보일 수 있으므로 적용 전 확인과 `lock_wait_timeout` 이 필요하다.
 - V6 의 `kakao_notify_consent` 는 `user(id)` 를 참조하는 FK 를 만든다. 짧은 공유 메타데이터 락이면 충분하다.
 - 운영 `user` 행 수는 이 환경에서 알 수 없다. 체크리스트 2단계에서 확인한다.
@@ -39,11 +39,11 @@ V2~V6 어디에도 `IF NOT EXISTS` / `IF EXISTS` 가 없다. 그래서 "일부�
 
 **권장 방식: 앱이 부팅하며 마이그레이션하게 두지 말고, 배포 전에 사람이 `flyway migrate` 를 먼저 실행한다.** 앱 부팅 중 실패하면 새 이미지가 뜨지 못한 채 재시작을 반복하고, 실패한 마이그레이션이 남아 계속 거부되기 때문이다. 미리 적용해 두면 새 이미지는 할 일이 없다.
 
-`<...>` 는 자리표시자다. **접속 URL 은 앱과 같은 `jdbc:mariadb://` 를 쓴다**(앱은 MariaDB 드라이버로 접속하고 리허설도 이 URL 로 돌렸다). 서버가 MySQL 이고 Flyway CLI 에서 이 드라이버를 못 찾으면 `jdbc:mysql://<host>:3306/cabi` 로 바꿔도 된다(`FLYWAY_BASELINE.md` 의 예시가 이 형식이다). 비밀번호는 셸 히스토리에 남지 않게 환경변수로만 넘긴다(`export FLYWAY_PASSWORD=...` 을 대화형으로 입력).
+`<...>` 는 자리표시자다. **접속 URL 의 기본값은 `jdbc:mysql://` 이다**(운영 서버가 MySQL 이고 `FLYWAY_BASELINE.md` 의 예시와 같은 형식). 참고로 앱은 MariaDB 드라이버(`jdbc:mariadb://`)로 MySQL 서버에 접속하며 리허설도 그 URL 로 돌렸으므로, 앱과 똑같이 맞추고 싶으면 `jdbc:mariadb://<host>:3306/cabi` 를 대체안으로 쓸 수 있다. 비밀번호는 셸 히스토리에 남지 않게 환경변수로만 넘긴다(`export FLYWAY_PASSWORD=...` 을 대화형으로 입력).
 
 1. **사전 확인 (읽기 전용)**
    ```sql
-   SELECT VERSION();                                              -- MariaDB 10.3+ 또는 MySQL 8.0.12+ 여야 INSTANT 가능 (운영 DB 종류도 여기서 확인)
+   SELECT VERSION();                                              -- 8.0.12 이상이어야 INSTANT 가능 (운영은 MySQL 8.0 이어야 한다. 로컬 MariaDB 라면 10.3+)
    SELECT COUNT(*) FROM `user`;                                   -- 행 수 (재구성 없음이지만 규모 파악)
    SHOW TABLES LIKE 'faq%';  SHOW TABLES LIKE 'kakao_notify%';    -- 빈 결과여야 함 (충돌하는 테이블 없음)
    SHOW COLUMNS FROM `user` LIKE 'kakao_alarm';                   -- 빈 결과여야 함
@@ -60,13 +60,13 @@ V2~V6 어디에도 `IF NOT EXISTS` / `IF EXISTS` 가 없다. 그래서 "일부�
    수 초 넘게 열린 트랜잭션이 보이면 끝나기를 기다리거나 원인을 먼저 확인한다.
 5. **상태 확인**
    ```bash
-   flyway -url="jdbc:mariadb://<host>:3306/cabi" -user=<user> \
+   flyway -url="jdbc:mysql://<host>:3306/cabi" -user=<user> \
           -locations=filesystem:src/main/resources/db/migration info
    ```
    V1 `Baseline`, V2~V6 `Pending` 이어야 한다.
 6. **적용** (메타데이터 락을 무한정 기다리지 않게 세션 타임아웃을 건다)
    ```bash
-   flyway -url="jdbc:mariadb://<host>:3306/cabi" -user=<user> \
+   flyway -url="jdbc:mysql://<host>:3306/cabi" -user=<user> \
           -locations=filesystem:src/main/resources/db/migration \
           -initSql="SET SESSION lock_wait_timeout=10" \
           migrate
@@ -103,6 +103,6 @@ cat build/migration-rehearsal.txt                        # 관찰값 기록
 
 ## 6. 한계
 
-- 운영 DB 의 실제 버전, `user` 행 수, 계정 권한, 백업 설정은 이 환경에서 확인하지 못했다(체크리스트 1~3번에서 사람이 확인).
+- 운영 DB 는 Azure Database for MySQL 8.0 이라고 전해 들은 것이며, 마이너 버전, `user` 행 수, 계정 권한, 백업 설정은 이 환경에서 확인하지 못했다(체크리스트 1~3번에서 사람이 확인). `mariadb:10.6` 결과는 로컬 compose 환경용이다.
 - 중간 실패는 "같은 이름의 객체가 먼저 있는 경우"로 시뮬레이션했다. 권한 부족·디스크·연결 끊김 같은 다른 원인도 결과 상태(일부만 적용 + `success=0`)는 같지만 시험하지는 않았다.
 - 리허설 5 의 대기 시간은 테스트 설정(`lock_wait_timeout=3`) 기준이다.
