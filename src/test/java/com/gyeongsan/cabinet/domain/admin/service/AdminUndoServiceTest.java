@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -43,12 +44,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -69,7 +71,7 @@ class AdminUndoServiceTest {
     @Mock private LentRepositoryPort lentRepository;
     @Mock private UserRepositoryPort userRepository;
     @Mock private ReservationPort reservationPort;
-    @InjectMocks private AdminUndoService service;
+    private AdminUndoService service;
 
     private Cabinet cabinet;
     private User user;
@@ -77,6 +79,15 @@ class AdminUndoServiceTest {
 
     @BeforeEach
     void setUp() {
+        // 트랜잭션은 이 단위 테스트의 관심사가 아니라서 가짜 트랜잭션 관리자로 감싼다(락/스냅샷 동작은 실제 DB 테스트가 검증한다).
+        service =
+                new AdminUndoService(
+                        adminActionLogPort,
+                        cabinetRepository,
+                        lentRepository,
+                        userRepository,
+                        reservationPort,
+                        new TransactionTemplate(mock(PlatformTransactionManager.class)));
         // 원래 작업 직후 상태: 사물함은 AVAILABLE, 대여는 종료됨.
         cabinet = cabinet(1L, 101, CabinetStatus.AVAILABLE);
         user = user(7L, "intra01");

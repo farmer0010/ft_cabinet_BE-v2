@@ -35,10 +35,11 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 사물함 일괄 변경(CABINET_BULK_STATUS_UPDATE)의 Undo.
@@ -47,12 +48,12 @@ import org.springframework.transaction.annotation.Transactional;
  * 충돌은 한 번에 모두 알려 준다. 이 작업이 건드린 것은 사물함 상태(status, lentType, 메모)와 대여 종료(endedAt)뿐이라 코인, 아이템, 패널티는 되돌릴
  * 것이 없다.
  *
- * <p>락 순서는 사용자 → 사물함(각각 ID 오름차순)이다. 현재 startLent/이사는 사용자 행을 잠그지 않아 Undo 와 동시에 같은 사용자가 다른 사물함을 빌리면
- * 활성 대여가 둘이 될 수 있는 좁은 틈이 남아 있으며, 핵심 대여 흐름을 건드리는 변경이라 이번 범위에서 제외했다(후속 작업).
+ * <p>락 순서는 사용자 → 사물함(각각 ID 오름차순)이며 대여·이사·반납·관리자 일괄 변경과 같다. 같은 사용자의 동시 대여와 겹쳐도 활성 대여가 둘이 되지 않도록 두
+ * 단계로 나눈다. 1단계는 읽기 전용의 짧은 트랜잭션으로 원본 감사 기록(한 번 만들어지면 바뀌지 않는다)을 읽어 잠글 대상을 정하고, 2단계 트랜잭션은 락 획득을 첫 DB
+ * 문장으로 두어 락 뒤의 일반 SELECT 가 최신 커밋을 보게 한다. "이미 되돌렸나"(findUndoBatchIdOf)도 락 뒤에 다시 확인한다. 락 전에 일반 SELECT
+ * 로 스냅샷을 잡으면 락 뒤의 검사가 그 시점의 낡은 상태를 보기 때문이다(감사 M-8).
  */
 @Service
-@RequiredArgsConstructor
-@Transactional
 @Log4j2
 public class AdminUndoService implements AdminUndoUseCase {
 
@@ -61,8 +62,40 @@ public class AdminUndoService implements AdminUndoUseCase {
     private final LentRepositoryPort lentRepository;
     private final UserRepositoryPort userRepository;
     private final ReservationPort reservationPort;
+    private final TransactionTemplate transactionTemplate;
+    private final TransactionTemplate readOnlyTransactionTemplate;
+
+    public AdminUndoService(
+            AdminActionLogPort adminActionLogPort,
+            CabinetRepositoryPort cabinetRepository,
+            LentRepositoryPort lentRepository,
+            UserRepositoryPort userRepository,
+            ReservationPort reservationPort,
+            TransactionTemplate transactionTemplate) {
+        this.adminActionLogPort = adminActionLogPort;
+        this.cabinetRepository = cabinetRepository;
+        this.lentRepository = lentRepository;
+        this.userRepository = userRepository;
+        this.reservationPort = reservationPort;
+        this.transactionTemplate = transactionTemplate;
+        this.readOnlyTransactionTemplate =
+                new TransactionTemplate(transactionTemplate.getTransactionManager());
+        this.readOnlyTransactionTemplate.setReadOnly(true);
+    }
+
+    /**
+     * 1단계에서 읽은 원본 기록과, 2단계에서 잠글 대상 ID. 감사 기록은 한 번 만들어지면 바뀌지 않으므로 락 없이 읽어도 낡을 일이 없다. (낡을 수 있는 것은
+     * 사용자, 사물함, 대여의 현재 상태이고, 그것들은 2단계에서 락을 잡은 뒤에 읽는다.)
+     */
+    private record UndoPlan(
+            AdminActionLog original,
+            List<AdminActionLogItem> cabinetItems,
+            List<AdminActionLogItem> lentItems,
+            List<Long> userIds,
+            List<Long> cabinetIds) {}
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public UndoResponse undoBulkStatusUpdate(
             String batchId, UndoRequest request, AdminActor actor) {
         String undoBatchId = UUID.randomUUID().toString();
@@ -83,6 +116,17 @@ public class AdminUndoService implements AdminUndoUseCase {
                     "되돌리기 사유(reason)는 " + AdminActionLog.REASON_MAX_LENGTH + "자 이하여야 합니다.");
         }
 
+        // 1단계: 원본 기록을 읽어 잠글 대상을 정한다. 읽기 전용의 짧은 트랜잭션이라 여기서 잡힌 스냅샷은 2단계에 이어지지 않는다.
+        // (락 전에 일반 SELECT 로 스냅샷을 잡으면, 락을 얻은 뒤의 "활성 대여 있나" 검사가 그 시점의 낡은 상태를 본다 - 감사 M-8.)
+        UndoPlan plan = readOnlyTransactionTemplate.execute(status -> planOf(batchId));
+
+        // 2단계: 락 획득(사용자 -> 사물함 ID 오름차순)이 이 트랜잭션의 첫 DB 문장이다. 이후의 모든 일반 SELECT 는 락 뒤에 처음 스냅샷이 잡혀 최신
+        // 커밋을 본다.
+        return transactionTemplate.execute(
+                status -> undoUnderLocks(batchId, undoBatchId, reason, actor, plan));
+    }
+
+    private UndoPlan planOf(String batchId) {
         AdminActionLog original =
                 adminActionLogPort
                         .findByBatchId(batchId)
@@ -98,7 +142,6 @@ public class AdminUndoService implements AdminUndoUseCase {
         List<AdminActionLogItem> cabinetItems = itemsOf(original, AdminActionTargetType.CABINET);
         List<AdminActionLogItem> lentItems = itemsOf(original, AdminActionTargetType.LENT_HISTORY);
 
-        // 락: 사용자 → 사물함, 각각 ID 오름차순. 락을 먼저 잡아야 아래의 "이미 되돌렸나" 확인과 상태 비교가 확정된다.
         List<Long> userIds =
                 lentItems.stream()
                         .map(i -> longOf(i.before(), "userId"))
@@ -106,16 +149,28 @@ public class AdminUndoService implements AdminUndoUseCase {
                         .distinct()
                         .sorted()
                         .toList();
-        Map<Long, User> users = new HashMap<>();
-        for (Long userId : userIds) {
-            userRepository.findByIdWithLock(userId).ifPresent(u -> users.put(userId, u));
-        }
         List<Long> cabinetIds =
                 cabinetItems.stream()
                         .map(AdminActionLogItem::targetId)
                         .distinct()
                         .sorted()
                         .toList();
+        return new UndoPlan(original, cabinetItems, lentItems, userIds, cabinetIds);
+    }
+
+    private UndoResponse undoUnderLocks(
+            String batchId, String undoBatchId, String reason, AdminActor actor, UndoPlan plan) {
+        List<AdminActionLogItem> cabinetItems = plan.cabinetItems();
+        List<AdminActionLogItem> lentItems = plan.lentItems();
+        List<Long> userIds = plan.userIds();
+        List<Long> cabinetIds = plan.cabinetIds();
+
+        // 락: 사용자 → 사물함, 각각 ID 오름차순(대여·이사·반납·관리자 일괄 변경과 같은 순서). 락을 먼저 잡아야 아래의 "이미 되돌렸나" 확인과 상태 비교가
+        // 확정된다.
+        Map<Long, User> users = new HashMap<>();
+        for (Long userId : userIds) {
+            userRepository.findByIdWithLock(userId).ifPresent(u -> users.put(userId, u));
+        }
         Map<Long, Cabinet> cabinets = new HashMap<>();
         for (Long cabinetId : cabinetIds) {
             cabinetRepository
