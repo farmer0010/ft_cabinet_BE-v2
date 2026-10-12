@@ -309,7 +309,9 @@ class MigrationRehearsalMysqlTest {
                 for (int i = 0; i < 18; i++) {
                     s.execute(
                             "INSERT INTO `user` (name, is_pisciner)"
-                                    + " SELECT CONCAT('u', id, '_', FLOOR(RAND()*1000000)), b'0'"
+                                    + " SELECT CONCAT('r"
+                                    + i
+                                    + "_', id), b'0'"
                                     + " FROM `user`");
                 }
             }
