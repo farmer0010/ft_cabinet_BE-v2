@@ -24,6 +24,10 @@ public interface CabinetRepository extends JpaRepository<Cabinet, Long> {
 
     Optional<Cabinet> findByVisibleNum(Integer visibleNum);
 
+    /** 엔티티를 영속성 컨텍스트에 올리지 않고 ID(스칼라)만 읽는다. 락을 잡기 전에 대상 사물함을 알아내는 용도다. */
+    @Query("SELECT c.id FROM Cabinet c WHERE c.visibleNum = :visibleNum")
+    Optional<Long> findIdByVisibleNum(@Param("visibleNum") Integer visibleNum);
+
     List<Cabinet> findAllByFloor(Integer floor);
 
     List<Cabinet> findAllByStatus(CabinetStatus status);
