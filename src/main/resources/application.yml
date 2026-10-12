@@ -29,6 +29,8 @@ spring:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6379}
+      # 비밀번호와 TLS 는 prod 프로필(application-prod.yml)이 채운다. 다른 프로필이면 SPRING_DATA_REDIS_PASSWORD,
+      # SPRING_DATA_REDIS_SSL_ENABLED=true 를 직접 주입해야 하며, 없으면 RedisConfig 가 부팅을 실패시킨다.
 
   flyway:
     # 기본은 꺼 둔다. 설정 실수로 다른 DB(특히 운영)에서 마이그레이션이 조용히 실행되는 것을 막기 위해
@@ -156,6 +158,9 @@ ai:
     url: ${AI_SERVER_URL:http://ai:8000}
 
 app:
+  redis:
+    # 로컬/테스트에서만 Redis 비밀번호·TLS 없이 연결하겠다는 명시적 선언. 기본 false 이며 prod 프로필에서는 켜도 부팅이 실패한다.
+    allow-insecure: ${REDIS_ALLOW_INSECURE:false}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
   client:

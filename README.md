@@ -1035,6 +1035,11 @@ CORS_ALLOWED_ORIGINS=http://localhost,http://localhost:3000
 TZ=Asia/Seoul
 ```
 
+> **Redis 연결은 안전하지 않으면 부팅하지 않습니다.** 비밀번호가 비어 있거나, 원격 호스트인데 TLS 가 꺼져 있으면 앱이 시작되지 않습니다(`RedisConfig` / `RedisConnectionPolicy`).
+> - `prod` 프로필은 `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` 를 읽고 TLS 를 켭니다.
+> - 다른 프로필 이름으로 띄운다면 `SPRING_DATA_REDIS_PASSWORD` 와 `SPRING_DATA_REDIS_SSL_ENABLED=true` 를 직접 주입하세요(`REDIS_PASSWORD` 는 prod 프로필에서만 읽힙니다).
+> - 로컬/테스트에서 비밀번호 없는 Redis 를 쓰려면 `REDIS_ALLOW_INSECURE=true` 를 **명시**해야 합니다. `prod` 프로필에서는 이 값을 켜도 부팅이 실패합니다. (`docker-compose.yaml` 의 로컬 스택은 이 값을 켜 둡니다.)
+
 **B. `src/main/resources/secret.properties` (Optional)**
 `.env`로 대체 가능하나, 로컬 실행 시 필요할 수 있습니다. `application.yml`의 환경 변수를 대체할 수 있도록 동일한 키를 포함해야 합니다.
 ```properties
