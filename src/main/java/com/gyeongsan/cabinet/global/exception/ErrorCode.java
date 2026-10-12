@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_001", "유저를 찾을 수 없습니다."),
     NOT_ENOUGH_COIN(HttpStatus.BAD_REQUEST, "USER_002", "씨앗이 부족합니다."),
+    ALREADY_ATTENDED(HttpStatus.CONFLICT, "USER_003", "이미 오늘 출석체크를 완료했습니다."),
 
     CABINET_NOT_FOUND(HttpStatus.NOT_FOUND, "CABINET_001", "사물함을 찾을 수 없습니다."),
     INVALID_CABINET_STATUS(HttpStatus.BAD_REQUEST, "CABINET_002", "사용할 수 없는 사물함 상태입니다."),
@@ -75,6 +76,7 @@ public enum ErrorCode {
     RESERVATION_NOT_FOUND(HttpStatus.NOT_FOUND, "LENT_012", "취소할 예약이 없습니다."),
 
     REQUEST_IN_PROGRESS(HttpStatus.CONFLICT, "LOCK_001", "현재 처리 중인 요청입니다. 잠시 후 다시 시도해주세요."),
+    CONCURRENT_UPDATE(HttpStatus.CONFLICT, "LOCK_002", "다른 요청과 동시에 처리되어 실패했습니다. 잠시 후 다시 시도해주세요."),
 
     CHATBOT_INVALID_QUESTION(HttpStatus.BAD_REQUEST, "CHATBOT_001", "질문을 입력해 주세요. (최대 200자)"),
     CHATBOT_NOT_READY(
