@@ -83,7 +83,9 @@ public enum ErrorCode {
     FAQ_NOT_FOUND(HttpStatus.NOT_FOUND, "CHATBOT_003", "FAQ 를 찾을 수 없습니다."),
     FAQ_INVALID(HttpStatus.BAD_REQUEST, "CHATBOT_004", "FAQ 내용이 올바르지 않습니다."),
 
-    ADMIN_ACTION_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "ADMIN_LOG_001", "관리자 작업 기록을 찾을 수 없습니다.");
+    ADMIN_ACTION_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "ADMIN_LOG_001", "관리자 작업 기록을 찾을 수 없습니다."),
+
+    AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "AUTH_001", "로그인이 필요합니다.");
 
     private final HttpStatus status;
     private final String code;

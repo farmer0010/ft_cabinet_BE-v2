@@ -166,6 +166,11 @@ app:
   ft-api:
     root-url: https://api.intra.42.fr
     token-url: https://api.intra.42.fr/oauth/token
+  # 인증 엔드포인트의 사용자별 한도(분당). 키는 서명 검증된 토큰의 사용자 ID 이며 IP/헤더는 쓰지 않는다.
+  rate-limit:
+    auth:
+      reissue-per-minute: ${AUTH_REISSUE_LIMIT_PER_MINUTE:20}
+      link-per-minute: ${AUTH_LINK_LIMIT_PER_MINUTE:10}
   # 사물함 오류제보 채널의 새 글을 관리자 DM 으로 전달한다. 기본은 꺼짐.
   # 켜려면 SLACK_REPORT_FORWARD_ENABLED=true 와 채널 ID 가 필요하다(채널 ID 가 없으면 부팅 실패).
   # 수신자는 설정이 아니라 DB 에서 권한이 ADMIN/MASTER 인 유저 전원이며, 슬랙 사용자명이 인트라 ID 와 같아야 DM 이 간다. 수신자가 없으면 경고만 남기고 보류한다.
