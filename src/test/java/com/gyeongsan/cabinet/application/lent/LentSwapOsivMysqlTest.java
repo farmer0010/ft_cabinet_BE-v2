@@ -203,7 +203,9 @@ class LentSwapOsivMysqlTest {
                                 throw e.getCause();
                             }
                             Gate gate = GATE.get();
-                            if (gate != null && method.getName().equals("findByVisibleNum")) {
+                            if (gate != null
+                                    && (method.getName().equals("findByVisibleNum")
+                                            || method.getName().equals("findIdByVisibleNum"))) {
                                 GATE.remove();
                                 gate.reached.countDown();
                                 if (!gate.release.await(30, TimeUnit.SECONDS)) {

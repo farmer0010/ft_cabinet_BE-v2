@@ -31,6 +31,11 @@ public class CabinetPersistenceAdapter implements CabinetRepositoryPort {
     }
 
     @Override
+    public Optional<Long> findIdByVisibleNum(Integer visibleNum) {
+        return cabinetRepository.findIdByVisibleNum(visibleNum);
+    }
+
+    @Override
     public Optional<Cabinet> findByVisibleNumWithLock(Integer visibleNum) {
         return cabinetRepository.findByVisibleNumWithLock(visibleNum);
     }

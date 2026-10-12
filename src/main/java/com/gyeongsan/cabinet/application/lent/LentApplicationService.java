@@ -393,11 +393,9 @@ public class LentApplicationService implements LentUseCase {
     private void swapWithLocks(Long userId, Integer newVisibleNum, Consumer<Cabinet> body) {
         for (int attempt = 0; attempt < MAX_RETURN_LOCK_ATTEMPTS; attempt++) {
             Long oldCabinetId = lentRepository.findActiveCabinetIdByUserId(userId).orElse(null);
-            Long newCabinetId =
-                    cabinetRepository
-                            .findByVisibleNum(newVisibleNum)
-                            .map(Cabinet::getId)
-                            .orElse(null);
+            // 엔티티가 아니라 ID 만 읽는다. 락 전에 엔티티를 읽으면 OSIV 가 켜진 웹 요청에서 그 낡은 인스턴스가 영속성 컨텍스트에 남아,
+            // 락 뒤 findByIdWithLock 이 행은 잠가도 상태는 갱신하지 않아 이미 차지된 사물함을 AVAILABLE 로 오판한다(감사 H-11).
+            Long newCabinetId = cabinetRepository.findIdByVisibleNum(newVisibleNum).orElse(null);
             try {
                 transactionTemplate.execute(
                         status -> {
