@@ -109,6 +109,11 @@ class SlackNoticeForwardServiceTest {
 
         final Map<Long, Row> rows = new LinkedHashMap<>();
         boolean failList;
+        boolean failFind;
+
+        /** 수신 대상 목록을 돌려준 직후 실행한다(목록과 발송 직전 재확인 사이의 변화를 흉내 낸다). */
+        Runnable afterListHook;
+
         int listCalls;
         final List<Long> revokedUsers = new ArrayList<>();
 
@@ -122,17 +127,27 @@ class SlackNoticeForwardServiceTest {
             if (failList) {
                 throw new IllegalStateException("db down");
             }
-            return rows.entrySet().stream()
-                    .filter(e -> active(e.getValue()))
-                    .map(
-                            e ->
-                                    new KakaoRecipient(
-                                            e.getKey(), e.getValue().name, e.getValue().encrypted))
-                    .toList();
+            List<KakaoRecipient> listed =
+                    rows.entrySet().stream()
+                            .filter(e -> active(e.getValue()))
+                            .map(
+                                    e ->
+                                            new KakaoRecipient(
+                                                    e.getKey(),
+                                                    e.getValue().name,
+                                                    e.getValue().encrypted))
+                            .toList();
+            if (afterListHook != null) {
+                afterListHook.run();
+            }
+            return listed;
         }
 
         @Override
         public Optional<KakaoRecipient> findActiveRecipient(Long userId) {
+            if (failFind) {
+                throw new IllegalStateException("db down");
+            }
             Row r = rows.get(userId);
             return r != null && active(r)
                     ? Optional.of(new KakaoRecipient(userId, r.name, r.encrypted))
@@ -181,6 +196,9 @@ class SlackNoticeForwardServiceTest {
         final List<String> refreshCalls = new ArrayList<>();
         final List<Sent> sent = new ArrayList<>();
 
+        /** 이 문구가 들어간 메시지는 일시 장애(503)로 실패한다. null 이면 꺼짐. */
+        String sendFailureWhenTextContains;
+
         @Override
         public KakaoGrant exchangeAuthorizationCode(String code, String redirectUri) {
             throw new UnsupportedOperationException();
@@ -201,6 +219,10 @@ class SlackNoticeForwardServiceTest {
             RuntimeException failure = sendFailures.get(accessToken);
             if (failure != null) {
                 throw failure;
+            }
+            if (sendFailureWhenTextContains != null
+                    && message.text().contains(sendFailureWhenTextContains)) {
+                throw new KakaoNotificationException("503");
             }
             sent.add(new Sent(accessToken, message));
         }
@@ -762,5 +784,238 @@ class SlackNoticeForwardServiceTest {
 
         assertThat(kakao.sent.get(0).message().linkUrl()).isEqualTo("https://front.example");
         assertThat(channel.permalinkCalls).isEmpty();
+    }
+
+    // ---- 커서 전진 규칙(M-11): 아무에게도 못 보냈고 재시도로 풀릴 수 있으면 보류, 그 밖에는 전진 ----
+
+    private static final String START = "1700000000.000000";
+
+    @Test
+    @DisplayName("전원이 일시 장애로 실패하면 커서를 옮기지 않고, 복구된 뒤 다음 주기에 한 번씩만 전달한다")
+    void allTransientFailuresHoldCursorAndRetry() {
+        addRecipient(1, "a");
+        addRecipient(2, "b");
+        kakao.sendFailures.put("access-of-rt-1", new KakaoNotificationException("503"));
+        kakao.sendFailures.put("access-of-rt-2", new KakaoNotificationException("timeout"));
+        channel.messages.add(msg("1700000100.000100", "중요 공지"));
+
+        service.forwardNewNotices();
+
+        assertThat(kakao.sent).isEmpty();
+        assertThat(cursor.store).containsEntry(CHANNEL, START);
+        assertThat(consents.rows.values()).noneMatch(r -> r.revoked);
+
+        kakao.sendFailures.clear(); // 카카오 복구
+        service.forwardNewNotices();
+        service.forwardNewNotices();
+
+        assertThat(kakao.recipientsOf("중요 공지"))
+                .as("복구 뒤 사람마다 정확히 한 번")
+                .containsExactlyInAnyOrder("access-of-rt-1", "access-of-rt-2");
+        assertThat(cursor.store).containsEntry(CHANNEL, "1700000100.000100");
+    }
+
+    @Test
+    @DisplayName("토큰 갱신이 전원 실패해도(카카오 5xx 등) 커서를 옮기지 않는다")
+    void allRefreshFailuresHoldCursor() {
+        addRecipient(1, "a");
+        kakao.refreshFailures.put("rt-1", new KakaoNotificationException("503"));
+        channel.messages.add(msg("1700000100.000100", "공지"));
+
+        service.forwardNewNotices();
+
+        assertThat(cursor.store).containsEntry(CHANNEL, START);
+        kakao.refreshFailures.clear();
+        service.forwardNewNotices();
+        assertThat(kakao.sent).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("발송을 시도조차 못 한 일시 장애(발송 직전 수신 상태 조회 실패)도 커서를 옮기지 않는다")
+    void couldNotEvenAttemptHoldsCursor() {
+        addRecipient(1, "a");
+        consents.failFind = true;
+        channel.messages.add(msg("1700000100.000100", "공지"));
+
+        service.forwardNewNotices();
+
+        assertThat(kakao.sent).isEmpty();
+        assertThat(cursor.store).containsEntry(CHANNEL, START);
+
+        consents.failFind = false;
+        service.forwardNewNotices();
+        assertThat(kakao.sent).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("저장된 토큰을 전원 복호화하지 못하면(암호화 키 문제) 공지를 잃지 않도록 커서를 옮기지 않는다")
+    void allUndecryptableHoldsCursor() {
+        addRecipient(1, "a");
+        consents.rows.get(1L).encrypted = "v1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        channel.messages.add(msg("1700000100.000100", "공지"));
+
+        service.forwardNewNotices();
+
+        assertThat(cursor.store).containsEntry(CHANNEL, START);
+    }
+
+    @Test
+    @DisplayName("일부라도 성공하면 커서를 옮긴다 - 실패한 사람에게 다시 보내려 같은 공지를 성공한 사람에게 중복 발송하지 않는다")
+    void partialSuccessAdvancesWithoutDuplicates() {
+        addRecipient(1, "fails");
+        addRecipient(2, "fine");
+        kakao.sendFailures.put("access-of-rt-1", new KakaoNotificationException("503"));
+        channel.messages.add(msg("1700000100.000100", "공지"));
+
+        service.forwardNewNotices();
+        kakao.sendFailures.clear();
+        service.forwardNewNotices();
+
+        assertThat(cursor.store).containsEntry(CHANNEL, "1700000100.000100");
+        assertThat(kakao.recipientsOf("공지"))
+                .as("성공한 사람에게 두 번 가지 않는다")
+                .containsExactly("access-of-rt-2");
+    }
+
+    @Test
+    @DisplayName("영구 실패(동의 철회·토큰 만료·-402)뿐이면 재시도해도 소용없으니 커서를 옮긴다 - 무한 재시도하지 않는다")
+    void onlyPermanentFailuresAdvanceCursor() {
+        addRecipient(1, "withdrew");
+        addRecipient(2, "expired");
+        addRecipient(3, "no-scope");
+        kakao.refreshFailures.put("rt-1", new KakaoInvalidGrantException("invalid_grant"));
+        kakao.refreshFailures.put("rt-2", new KakaoInvalidGrantException("invalid_grant"));
+        kakao.sendFailures.put("access-of-rt-3", new KakaoInsufficientScopeException("-402"));
+        channel.messages.add(msg("1700000100.000100", "공지"));
+
+        service.forwardNewNotices();
+
+        assertThat(kakao.sent).isEmpty();
+        assertThat(consents.revokedUsers).containsExactlyInAnyOrder(1L, 2L, 3L);
+        assertThat(cursor.store).containsEntry(CHANNEL, "1700000100.000100");
+    }
+
+    @Test
+    @DisplayName("목록을 읽은 뒤 전원이 동의를 해지하거나 알림을 껐다면(영구) 커서를 옮긴다")
+    void allConsentsGoneBetweenListAndSendAdvances() {
+        addRecipient(1, "a");
+        channel.messages.add(msg("1700000100.000100", "공지"));
+        // 목록 조회 직후 발송 직전 재확인에서 빠지도록, 조회 시점에만 활성으로 보이게 한다.
+        FakeConsents.Row row = consents.rows.get(1L);
+        consents.afterListHook = () -> row.alarm = false;
+
+        service.forwardNewNotices();
+
+        assertThat(kakao.sent).isEmpty();
+        assertThat(cursor.store).containsEntry(CHANNEL, "1700000100.000100");
+    }
+
+    @Test
+    @DisplayName(
+            "여러 공지 중 앞 공지는 나갔고 뒤 공지가 전원 일시 실패하면, 커서는 앞 공지까지만 가고 다음 주기에 뒤 공지부터 이어서 보낸다(앞 공지 중복 없음)")
+    void resumesFromFailedNoticeWithoutResendingEarlierOnes() {
+        addRecipient(1, "a");
+        channel.messages.add(msg("1700000100.000100", "첫째"));
+        channel.messages.add(msg("1700000200.000100", "둘째"));
+        channel.messages.add(msg("1700000300.000100", "셋째"));
+        kakao.sendFailureWhenTextContains = "둘째";
+
+        service.forwardNewNotices();
+
+        assertThat(kakao.sent).extracting(s -> s.message().text()).containsExactly("📢 [공지] 첫째");
+        assertThat(cursor.store).containsEntry(CHANNEL, "1700000100.000100");
+
+        kakao.sendFailureWhenTextContains = null;
+        service.forwardNewNotices();
+
+        assertThat(kakao.sent)
+                .extracting(s -> s.message().text())
+                .containsExactly("📢 [공지] 첫째", "📢 [공지] 둘째", "📢 [공지] 셋째");
+        assertThat(cursor.store).containsEntry(CHANNEL, "1700000300.000100");
+    }
+
+    @Test
+    @DisplayName("보류 한도(24시간)를 넘기면 계속 실패하던 공지도 더 재시도하지 않고 건너뛴다 - 재시도는 유한하다")
+    void retriesAreBoundedByHoldLimit() {
+        addRecipient(1, "a");
+        kakao.sendFailures.put("access-of-rt-1", new KakaoNotificationException("503"));
+        String before = (NOW - 30 * 3600L) + ".000000";
+        cursor.store.put(CHANNEL, before);
+        channel.messages.add(msg((NOW - 23 * 3600L) + ".000100", "오래 못 나간 공지"));
+
+        service.forwardNewNotices();
+        assertThat(cursor.store).containsEntry(CHANNEL, before);
+
+        // 한 시간이 더 지나 보류 한도를 넘었다.
+        SlackNoticeForwardService later =
+                new SlackNoticeForwardService(
+                        channel,
+                        cursor,
+                        consents,
+                        kakao,
+                        CIPHER,
+                        new SlackNoticeSettings(CHANNEL, 3, 24, "https://front.example", true),
+                        Clock.fixed(Instant.ofEpochSecond(NOW + 2 * 3600L), ZoneOffset.UTC));
+        later.forwardNewNotices();
+
+        assertThat(cursor.store).containsEntry(CHANNEL, (NOW - 23 * 3600L) + ".000100");
+        assertThat(kakao.sent).isEmpty();
+    }
+
+    @Test
+    @DisplayName("'이전 N건 생략' 요약이 전원 일시 실패하면 개별 공지를 보내지 않고 커서도 그대로 둔다")
+    void summaryTransientFailureHolds() {
+        addRecipient(1, "a");
+        kakao.sendFailureWhenTextContains = "생략";
+        for (int i = 1; i <= 8; i++) {
+            channel.messages.add(msg("17000001%02d.000100".formatted(i), "공지" + i));
+        }
+
+        service.forwardNewNotices();
+
+        assertThat(kakao.sent).isEmpty();
+        assertThat(cursor.store).containsEntry(CHANNEL, START);
+    }
+
+    @Test
+    @DisplayName("요약이 나간 뒤 개별 공지가 실패해도 다음 주기에 요약을 다시 보내지 않는다")
+    void summaryIsNotResentAfterLaterHold() {
+        addRecipient(1, "a");
+        kakao.sendFailureWhenTextContains = "공지6";
+        for (int i = 1; i <= 8; i++) {
+            channel.messages.add(msg("17000001%02d.000100".formatted(i), "공지" + i));
+        }
+
+        service.forwardNewNotices();
+        kakao.sendFailureWhenTextContains = null;
+        service.forwardNewNotices();
+
+        assertThat(kakao.sent)
+                .extracting(s -> s.message().text())
+                .filteredOn(t -> t.contains("생략"))
+                .hasSize(1);
+        assertThat(kakao.sent)
+                .extracting(s -> s.message().text())
+                .filteredOn(t -> t.contains("공지6"))
+                .hasSize(1);
+    }
+
+    @Test
+    @DisplayName("보류 후 재시도할 때 퍼머링크를 다시 조회하지 않는다 (공지 한 건당 한 번)")
+    void retryDoesNotRepeatPermalinkLookup() {
+        addRecipient(1, "a");
+        kakao.sendFailures.put("access-of-rt-1", new KakaoNotificationException("503"));
+        channel.permalinks.put("1700000100.000100", "https://slack.example/p1");
+        channel.messages.add(msg("1700000100.000100", "공지"));
+
+        service.forwardNewNotices();
+        service.forwardNewNotices();
+        service.forwardNewNotices();
+        kakao.sendFailures.clear();
+        service.forwardNewNotices();
+
+        assertThat(channel.permalinkCalls).hasSize(1);
+        assertThat(kakao.sent).hasSize(1);
+        assertThat(kakao.sent.get(0).message().linkUrl()).isEqualTo("https://slack.example/p1");
     }
 }
