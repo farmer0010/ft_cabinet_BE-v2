@@ -53,7 +53,6 @@ class KakaoNotificationAdapterTest {
         return adapter;
     }
 
-    /** 보낸 요청의 form 본문을 읽는다. */
     private static String formBody(ClientRequest request) {
         org.springframework.mock.http.client.reactive.MockClientHttpRequest mock =
                 new org.springframework.mock.http.client.reactive.MockClientHttpRequest(

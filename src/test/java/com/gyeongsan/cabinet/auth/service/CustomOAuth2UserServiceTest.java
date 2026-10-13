@@ -71,7 +71,6 @@ class CustomOAuth2UserServiceTest {
     @Test
     @DisplayName("카카오 로그인 시 연동 정보가 정상적으로 있으면 DefaultOAuth2User에 42 intraId가 login 키로 주입된다")
     void loadUser_kakaoSuccess() {
-        // given
         OAuth2UserRequest request = createOAuth2UserRequest("kakao", "id");
         Map<String, Object> kakaoAttributes =
                 Map.of("id", 98765432L, "connected_at", "2026-05-29T15:48:43Z");
@@ -86,10 +85,8 @@ class CustomOAuth2UserServiceTest {
                 .willReturn(Optional.of(link));
         given(bannedUserRepository.existsByIntraId("juykim")).willReturn(false);
 
-        // when
         OAuth2User result = userService.handleSocialLogin(request, kakaoAttributes, "kakao");
 
-        // then
         assertEquals("98765432", result.getName());
         assertEquals("juykim", result.getAttributes().get("login"));
     }
@@ -97,7 +94,6 @@ class CustomOAuth2UserServiceTest {
     @Test
     @DisplayName("구글 로그인 시 연동 정보가 정상적으로 있으면 DefaultOAuth2User에 42 intraId가 login 키로 주입된다")
     void loadUser_googleSuccess() {
-        // given
         OAuth2UserRequest request = createOAuth2UserRequest("google", "sub");
         Map<String, Object> googleAttributes =
                 Map.of("sub", "google-sub-12345", "email", "google@example.com");
@@ -112,10 +108,8 @@ class CustomOAuth2UserServiceTest {
                 .willReturn(Optional.of(link));
         given(bannedUserRepository.existsByIntraId("juykim")).willReturn(false);
 
-        // when
         OAuth2User result = userService.handleSocialLogin(request, googleAttributes, "google");
 
-        // then
         assertEquals("google-sub-12345", result.getName());
         assertEquals("juykim", result.getAttributes().get("login"));
     }
@@ -123,14 +117,12 @@ class CustomOAuth2UserServiceTest {
     @Test
     @DisplayName("카카오 로그인 시 연동 정보가 없으면 예외가 발생한다")
     void loadUser_kakaoNotLinked() {
-        // given
         OAuth2UserRequest request = createOAuth2UserRequest("kakao", "id");
         Map<String, Object> kakaoAttributes = Map.of("id", 98765432L);
 
         given(oauthLinkRepository.findByProviderAndProviderId("kakao", "98765432"))
                 .willReturn(Optional.empty());
 
-        // when & then
         OAuth2AuthenticationException exception =
                 assertThrows(
                         OAuth2AuthenticationException.class,
@@ -142,14 +134,12 @@ class CustomOAuth2UserServiceTest {
     @Test
     @DisplayName("구글 로그인 시 연동 정보가 없으면 예외가 발생한다")
     void loadUser_googleNotLinked() {
-        // given
         OAuth2UserRequest request = createOAuth2UserRequest("google", "sub");
         Map<String, Object> googleAttributes = Map.of("sub", "google-sub-12345");
 
         given(oauthLinkRepository.findByProviderAndProviderId("google", "google-sub-12345"))
                 .willReturn(Optional.empty());
 
-        // when & then
         OAuth2AuthenticationException exception =
                 assertThrows(
                         OAuth2AuthenticationException.class,
@@ -161,7 +151,6 @@ class CustomOAuth2UserServiceTest {
     @Test
     @DisplayName("구글 로그인 시 연동된 유저가 정지 상태이면 예외가 발생한다")
     void loadUser_googleBannedUser() {
-        // given
         OAuth2UserRequest request = createOAuth2UserRequest("google", "sub");
         Map<String, Object> googleAttributes = Map.of("sub", "google-sub-12345");
 
@@ -175,7 +164,6 @@ class CustomOAuth2UserServiceTest {
                 .willReturn(Optional.of(link));
         given(bannedUserRepository.existsByIntraId("bannedUser")).willReturn(true);
 
-        // when & then
         OAuth2AuthenticationException exception =
                 assertThrows(
                         OAuth2AuthenticationException.class,

@@ -12,7 +12,6 @@ public final class FaqIndex {
 
     public static final FaqIndex EMPTY = new FaqIndex(List.of(), Map.of());
 
-    /** 질문 표현 하나와 그 벡터. */
     public record Entry(long faqId, String question, float[] vector) {}
 
     /** FAQ 별로 가장 비슷했던 질문 표현과 점수. */

@@ -76,7 +76,7 @@ class FaqIndexManagerTest {
         manager.rebuild();
         int callsAfterBuild = embedding.calls.size();
 
-        manager.refreshIfChanged(); // 변화 없음
+        manager.refreshIfChanged();
         pause();
         assertThat(embedding.calls).hasSize(callsAfterBuild);
 

@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test;
 
 class LazyEmbeddingPortTest {
 
-    /** 직접 움직일 수 있는 시계. */
     static class MutableClock extends Clock {
         Instant now = Instant.parse("2026-10-07T00:00:00Z");
 

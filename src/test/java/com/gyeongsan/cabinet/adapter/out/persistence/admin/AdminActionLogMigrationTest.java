@@ -102,7 +102,6 @@ class AdminActionLogMigrationTest {
             MigrateResult result = flyway(mysql).migrate();
             assertThat(result.migrationsExecuted).isEqualTo(5);
             assertThat(flyway(mysql).info().current().getVersion().getVersion()).isEqualTo("6");
-            // 두 번째 실행은 아무것도 하지 않는다.
             assertThat(flyway(mysql).migrate().migrationsExecuted).isZero();
 
             try (SessionFactory sessionFactory = validatingSessionFactory(mysql)) {

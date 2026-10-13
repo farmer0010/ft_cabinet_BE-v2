@@ -56,7 +56,6 @@ class OauthLinkServiceTest {
     @Test
     @DisplayName("성공적으로 카카오 계정을 연동한다")
     void linkKakaoAccount_success() {
-        // given
         Long userId = 1L;
         String authCode = "auth-code";
         OAuthUserInfo oauthInfo = new OAuthUserInfo("12345678", "kakao@example.com");
@@ -68,17 +67,14 @@ class OauthLinkServiceTest {
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(oauthLinkRepository.existsByUserAndProvider(user, "kakao")).willReturn(false);
 
-        // when
         oauthLinkService.linkAccount(userId, "kakao", authCode);
 
-        // then
         then(oauthLinkRepository).should(times(1)).save(any(OauthLink.class));
     }
 
     @Test
     @DisplayName("성공적으로 구글 계정을 연동한다")
     void linkGoogleAccount_success() {
-        // given
         Long userId = 1L;
         String authCode = "auth-code";
         OAuthUserInfo oauthInfo = new OAuthUserInfo("google-sub-id", "google@example.com");
@@ -90,10 +86,8 @@ class OauthLinkServiceTest {
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(oauthLinkRepository.existsByUserAndProvider(user, "google")).willReturn(false);
 
-        // when
         oauthLinkService.linkAccount(userId, "google", authCode);
 
-        // then
         then(oauthLinkRepository).should(times(1)).save(any(OauthLink.class));
     }
 
@@ -119,7 +113,6 @@ class OauthLinkServiceTest {
     @Test
     @DisplayName("이미 다른 42 계정에 연동된 소셜 ID인 경우 예외를 던진다")
     void linkAccount_alreadyLinkedToOther() {
-        // given
         Long userId = 1L;
         String authCode = "auth-code";
         OAuthUserInfo oauthInfo = new OAuthUserInfo("12345678", "kakao@example.com");
@@ -128,7 +121,6 @@ class OauthLinkServiceTest {
         given(oauthLinkRepository.existsByProviderAndProviderId("kakao", "12345678"))
                 .willReturn(true);
 
-        // when & then
         ServiceException exception =
                 assertThrows(
                         ServiceException.class,
@@ -141,7 +133,6 @@ class OauthLinkServiceTest {
     @Test
     @DisplayName("현재 유저가 이미 해당 소셜 연동을 완료한 경우 예외를 던진다")
     void linkAccount_alreadyLinkedByUser() {
-        // given
         Long userId = 1L;
         String authCode = "auth-code";
         OAuthUserInfo oauthInfo = new OAuthUserInfo("12345678", "kakao@example.com");
@@ -153,7 +144,6 @@ class OauthLinkServiceTest {
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(oauthLinkRepository.existsByUserAndProvider(user, "kakao")).willReturn(true);
 
-        // when & then
         ServiceException exception =
                 assertThrows(
                         ServiceException.class,
@@ -166,7 +156,6 @@ class OauthLinkServiceTest {
     @Test
     @DisplayName("카카오 토큰 교환에는 포트가 돌려준 연동용 redirect URI 가 그대로 전달된다")
     void linkKakaoAccount_passesRedirectUriFromPort() {
-        // given
         Long userId = 1L;
         String authCode = "auth-code";
         String redirectUri = "https://subak.site/auth/link/callback/kakao";
@@ -180,10 +169,8 @@ class OauthLinkServiceTest {
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(oauthLinkRepository.existsByUserAndProvider(user, "kakao")).willReturn(false);
 
-        // when
         oauthLinkService.linkAccount(userId, "kakao", authCode);
 
-        // then
         then(kakaoApiClient).should().getOAuthUserInfo(authCode, redirectUri);
         then(oauthLinkRepository).should(times(1)).save(any(OauthLink.class));
     }
@@ -191,7 +178,6 @@ class OauthLinkServiceTest {
     @Test
     @DisplayName("구글 토큰 교환에는 포트가 돌려준 연동용 redirect URI 가 그대로 전달된다")
     void linkGoogleAccount_passesRedirectUriFromPort() {
-        // given
         Long userId = 1L;
         String authCode = "auth-code";
         String redirectUri = "https://subak.site/auth/link/callback/google";
@@ -205,10 +191,8 @@ class OauthLinkServiceTest {
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(oauthLinkRepository.existsByUserAndProvider(user, "google")).willReturn(false);
 
-        // when
         oauthLinkService.linkAccount(userId, "google", authCode);
 
-        // then
         then(googleApiClient).should().getOAuthUserInfo(authCode, redirectUri);
         then(oauthLinkRepository).should(times(1)).save(any(OauthLink.class));
     }

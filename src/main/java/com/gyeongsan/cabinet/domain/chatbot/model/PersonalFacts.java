@@ -22,7 +22,6 @@ public sealed interface PersonalFacts {
     /** 내 패널티. 패널티가 없으면 releaseDate 는 null. */
     record PenaltyStatus(int penaltyDays, LocalDate releaseDate) implements PersonalFacts {}
 
-    /** 대여권 지급 조건과 내 현황. */
     record TicketCondition(
             int thresholdMinutes,
             int monthlyLogtimeMinutes,

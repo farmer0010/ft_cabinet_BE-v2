@@ -276,7 +276,6 @@ class LentConcurrencyMysqlTest {
         }
     }
 
-    /** 컨텍스트에서 꺼낸 서비스와 시드 데이터 헬퍼. */
     static final class Fixture {
         final LentUseCase service;
         final JdbcTemplate jdbc;
@@ -387,7 +386,6 @@ class LentConcurrencyMysqlTest {
             return visibleNum;
         }
 
-        /** 유저가 이미 대여 중인 상태를 만든다. */
         void rent(Long userId, int visibleNum, LocalDateTime expiredAt) {
             tx.execute(
                     s -> {
@@ -651,8 +649,6 @@ class LentConcurrencyMysqlTest {
                     assertThat(f.usedTickets(swapper, ItemType.SWAP)).isZero();
                 });
     }
-
-    // ---- 반납 경로와 패널티 감면 (사물함 행 락 / 사용자 행 락) ----
 
     @ParameterizedTest(name = "{0}")
     @ValueSource(strings = {"mysql:8.0", "mysql:8.4"})

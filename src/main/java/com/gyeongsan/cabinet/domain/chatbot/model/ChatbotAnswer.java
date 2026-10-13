@@ -21,7 +21,6 @@ public record ChatbotAnswer(
         List<Suggestion> suggestions,
         PersonalIntent personalAction) {
 
-    /** 개인화 칩 없이 만드는 기본 형태. */
     public ChatbotAnswer(
             Result result,
             Faq faq,

@@ -216,7 +216,6 @@ class LentSwapOsivMysqlTest {
                         });
     }
 
-    /** 컨텍스트와 EntityManagerFactory 를 함께 넘기는 본문. */
     @FunctionalInterface
     private interface Body {
         void run(LentConcurrencyMysqlTest.Fixture f, EntityManagerFactory emf) throws Exception;

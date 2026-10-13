@@ -1,8 +1,6 @@
 package com.gyeongsan.cabinet.application.chatbot;
 
 /**
- * 챗봇 동작 설정.
- *
  * @param matchThreshold 이 유사도 이상이고 1·2위 차이도 {@code matchMargin} 이상이면 "찾았다"로 보고 답변을 그대로 보여준다
  * @param suggestThreshold 이 유사도 이상이면 "비슷한 질문이 이것 아닌가요?" 후보로 보여준다. 이 값 미만은 못 찾은 것
  * @param maxSuggestions 후보로 보여줄 최대 개수

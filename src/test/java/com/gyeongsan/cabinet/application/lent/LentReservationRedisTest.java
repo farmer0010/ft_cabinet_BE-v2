@@ -114,8 +114,6 @@ class LentReservationRedisTest {
         }
     }
 
-    // ---------- 도우미 ----------
-
     private static User user(Long id, String name) {
         User u = User.of(name, name + "@example.com", null, UserRole.USER);
         ReflectionTestUtils.setField(u, "id", id);
@@ -144,8 +142,6 @@ class LentReservationRedisTest {
         assertThat(reservationPort.getReservedUserId(visibleNum)).contains(userId);
         assertThat(reservationPort.getUserReservation(userId)).contains(visibleNum);
     }
-
-    // ---------- 재예약(방안 A) ----------
 
     @Test
     @DisplayName("다른 사물함을 예약하면 기존 예약은 자동 취소되고 새 예약만 남는다")
@@ -209,8 +205,6 @@ class LentReservationRedisTest {
         assertThat(reservationPort.getReservedUserId(202)).isEmpty();
     }
 
-    // ---------- 레이스 ----------
-
     @Test
     @DisplayName("같은 유저가 서로 다른 사물함을 동시에 예약해도 예약은 항상 하나만 남는다")
     void concurrentReservations_sameUser_leavesExactlyOne() throws Exception {
@@ -246,8 +240,6 @@ class LentReservationRedisTest {
             throw new RuntimeException(e);
         }
     }
-
-    // ---------- 유령 선점 회귀 ----------
 
     @Test
     @DisplayName("101 을 예약한 뒤 102 를 대여하면 101 예약도 함께 정리된다(유령 선점 회귀)")
@@ -287,8 +279,6 @@ class LentReservationRedisTest {
         assertThat(reservationPort.getReservedUserId(101)).isEmpty();
         assertThat(reservationPort.getUserReservation(USER_ID)).isEmpty();
     }
-
-    // ---------- 예약 취소 ----------
 
     @Test
     @DisplayName("내 예약을 취소하면 취소한 번호를 돌려주고, 사물함이 다시 비어 두 키가 모두 지워진다")

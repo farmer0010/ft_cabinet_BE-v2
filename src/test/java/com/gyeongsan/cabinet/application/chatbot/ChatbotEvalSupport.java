@@ -105,7 +105,6 @@ final class ChatbotEvalSupport {
         }
     }
 
-    /** 질문 하나를 검색한 결과(FAQ 단위 순위). */
     record Probe(
             EvalItem item,
             List<String> rankedKeys,
@@ -286,8 +285,6 @@ final class ChatbotEvalSupport {
         return selection;
     }
 
-    // ---- 임계값 표 ----
-
     /** 제안 모드(임계값 이상인 후보만 보여 줌)와 자동 답변 모드를 함께 보기 위한 한 줄. */
     record Row(
             double threshold,
@@ -357,8 +354,6 @@ final class ChatbotEvalSupport {
                 .min(Comparator.comparingDouble(Row::threshold))
                 .orElse(null);
     }
-
-    // ---- 신호 품질 ----
 
     static double quantile(double[] sorted, double q) {
         if (sorted.length == 0) {
@@ -434,8 +429,6 @@ final class ChatbotEvalSupport {
                                 .thenComparing(Map.Entry.comparingByKey()))
                 .toList();
     }
-
-    // ---- 두 세트에서 같은 칸을 비교하는 공통 격자 ----
 
     static final double[] GRID_T = {0.86, 0.88, 0.90, 0.92, 0.93, 0.94, 0.95, 0.96};
     static final double[] GRID_M = {0, 0.01, 0.02, 0.03, 0.05};
