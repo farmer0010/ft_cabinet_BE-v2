@@ -7,7 +7,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** Redis 연결 안전 규칙의 경우의 수를 모두 확인한다. */
 class RedisConnectionPolicyTest {
 
     private static final String REMOTE = "cache.example.redis.test";
