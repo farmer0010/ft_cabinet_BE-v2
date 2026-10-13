@@ -19,7 +19,6 @@ public class LentReturnResponse {
     /** 반납 시점에 연체였는지. 패널티 부과 판정과 같은 기준이다. */
     private final boolean overdue;
 
-    /** 이번 반납으로 새로 붙은 패널티 일수. */
     private final int penaltyAppliedDays;
 
     private final LocalDateTime returnedAt;

@@ -21,7 +21,6 @@ public class PersonalIntentRouter {
 
     private record Entry(PersonalIntent intent, float[] vector) {}
 
-    /** 가장 비슷한 인텐트와 점수. */
     public record Hit(PersonalIntent intent, double score) {}
 
     private final Map<PersonalIntent, List<String>> catalog;

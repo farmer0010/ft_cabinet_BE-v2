@@ -149,8 +149,6 @@ class AdminActionLogControllerTest {
         mockMvc.perform(get("/v4/admin/action-logs/none")).andExpect(status().isNotFound());
     }
 
-    // ---------- Undo ----------
-
     @Test
     @DisplayName("Undo 는 batchId 와 사유, 호출한 관리자(ID, 이름)를 서비스로 넘기고 요약을 돌려준다")
     void undo_success() throws Exception {

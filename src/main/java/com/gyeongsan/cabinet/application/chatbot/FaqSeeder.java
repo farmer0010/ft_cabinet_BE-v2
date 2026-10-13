@@ -25,9 +25,6 @@ public class FaqSeeder {
         this.faqRepository = faqRepository;
     }
 
-    /**
-     * @return 새로 넣은 개수
-     */
     public int seedIfEmpty(List<SeedItem> items) {
         if (items == null || items.isEmpty() || faqRepository.count() > 0) {
             return 0;

@@ -99,8 +99,6 @@ class ChatbotRetrievalEvaluationTest {
         return list;
     }
 
-    // ---- 서식 ----
-
     private static String pct(double v) {
         return Double.isNaN(v) ? "—" : String.format(Locale.ROOT, "%.1f%%", v * 100);
     }
@@ -247,7 +245,6 @@ class ChatbotRetrievalEvaluationTest {
             sb.append('\n');
         }
 
-        // 틀린 질문 분석
         List<Map.Entry<String, Integer>> confusions = ChatbotEvalSupport.confusions(result);
         long sameCategory =
                 wrong.stream()
@@ -407,8 +404,6 @@ class ChatbotRetrievalEvaluationTest {
     private static int minVariants(List<SeedFaq> faqs) {
         return faqs.stream().mapToInt(f -> f.questions().size()).min().orElse(0);
     }
-
-    // ---- 평가 ----
 
     @Test
     @DisplayName("FAQ 의미 검색 평가: 재표현 질문을 올바른 FAQ 로 찾고, 범위 밖 질문은 거르는지 측정한다")

@@ -128,7 +128,6 @@ class FtGradeResolverTest {
             assertThat(snapshot.rejected()).as(bad).isTrue();
             assertThat(snapshot.shouldStore()).as(bad).isFalse();
         }
-        // 길이 32 는 허용한다.
         assertThat(resolve(new FtCursusEntry(21, "x".repeat(32))).shouldStore()).isTrue();
     }
 

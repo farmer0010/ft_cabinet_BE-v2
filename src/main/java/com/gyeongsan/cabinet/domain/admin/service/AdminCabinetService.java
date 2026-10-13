@@ -355,7 +355,6 @@ public class AdminCabinetService implements AdminCabinetUseCase {
         return request.reason().strip();
     }
 
-    /** 받은 요청을 로그에 그대로 남기기 위한 스냅샷. */
     private static Map<String, Object> requestSnapshot(BulkStatusUpdateRequest request) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("cabinetIds", request.cabinetIds());

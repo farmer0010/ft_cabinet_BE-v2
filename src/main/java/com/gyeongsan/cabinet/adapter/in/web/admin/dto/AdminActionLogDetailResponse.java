@@ -7,7 +7,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-/** 관리자 작업 기록 상세. 대상별 변경 전/후 값을 포함한다. */
 public record AdminActionLogDetailResponse(
         String batchId,
         AdminActionType actionType,

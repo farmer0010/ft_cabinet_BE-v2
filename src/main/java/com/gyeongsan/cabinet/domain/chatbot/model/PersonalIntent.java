@@ -19,7 +19,6 @@ public enum PersonalIntent {
         this.label = label;
     }
 
-    /** 화면에 칩(버튼)으로 보여 줄 문구. */
     public String label() {
         return label;
     }

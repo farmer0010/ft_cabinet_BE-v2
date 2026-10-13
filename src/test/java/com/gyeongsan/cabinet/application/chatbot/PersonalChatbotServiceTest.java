@@ -105,8 +105,6 @@ class PersonalChatbotServiceTest {
                 .willReturn(unusedTickets);
     }
 
-    // ---- LENT_EXPIRY ----
-
     @Test
     @DisplayName("만료일: 달력 날짜 기준 남은 일수와 만료 시각을 알려 준다")
     void lentExpiry() {
@@ -175,8 +173,6 @@ class PersonalChatbotServiceTest {
         assertThat(answer.message()).contains("대여 중인 사물함이 없어요");
     }
 
-    // ---- PENALTY_STATUS ----
-
     @Test
     @DisplayName("패널티: 남은 일수와 해제 예정일(오늘 + 일수)")
     void penalty() {
@@ -204,8 +200,6 @@ class PersonalChatbotServiceTest {
         assertThat(facts.releaseDate()).isNull();
         assertThat(answer.message()).contains("패널티가 없어요");
     }
-
-    // ---- LENT_TICKET_CONDITION ----
 
     @Test
     @DisplayName("대여권 조건: 일반 사용자는 4800분 기준, 부족한 만큼과 다음 지급일(다음 달 1일)")
@@ -243,8 +237,6 @@ class PersonalChatbotServiceTest {
         assertThat(answer.message()).contains("조건을 채웠어요").contains("새로 지급되지 않아요");
     }
 
-    // ---- LENT_BLOCKER_DIAGNOSIS ----
-
     @Test
     @DisplayName("대여 불가 진단: 패널티·이미 대여 중·대여권 없음을 startLent 검사 순서대로 모두 알린다")
     void blockersAll() {
@@ -281,8 +273,6 @@ class PersonalChatbotServiceTest {
                 .contains("다른 사람이 예약한 상태일 수 있어요")
                 .contains("라피신 전용 사물함만");
     }
-
-    // ---- 보안 경계 ----
 
     @Test
     @DisplayName("조회 대상은 인자로 받은 userId 하나뿐이다(다른 사용자는 조회하지 않고, 아무것도 저장하지 않는다)")

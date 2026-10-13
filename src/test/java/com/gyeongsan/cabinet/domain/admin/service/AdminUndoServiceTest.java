@@ -103,8 +103,6 @@ class AdminUndoServiceTest {
         given(adminActionLogPort.findUndoBatchIdOf(ORIGINAL)).willReturn(Optional.empty());
     }
 
-    // ---------- 도우미 ----------
-
     private static Map<String, Object> snap(Object... keyValues) {
         Map<String, Object> map = new LinkedHashMap<>();
         for (int i = 0; i < keyValues.length; i += 2) {
@@ -188,8 +186,6 @@ class AdminUndoServiceTest {
         assertThat(lent.getEndedAt()).isNotNull();
         verify(adminActionLogPort, never()).save(any());
     }
-
-    // ---------- 성공 ----------
 
     @Test
     @DisplayName("충돌이 없으면 사물함을 변경 전 상태로 복구하고 대여를 되살리며, Undo 를 감사 기록에 남긴다")
@@ -301,8 +297,6 @@ class AdminUndoServiceTest {
         order.verify(cabinetRepository).findByIdWithLock(1L);
         order.verify(cabinetRepository).findByIdWithLock(3L);
     }
-
-    // ---------- 거부 ----------
 
     @Test
     @DisplayName("이미 되돌려진 작업은 ALREADY_UNDONE 으로 거부하고 어떤 Undo 였는지 알려 준다")
@@ -500,8 +494,6 @@ class AdminUndoServiceTest {
         verify(adminActionLogPort, never()).save(any());
         assertThat(lent.getEndedAt()).isNotNull();
     }
-
-    // ---------- 입력 검증 ----------
 
     @Test
     @DisplayName("사유가 없거나 공백이면 조회·락 전에 400 대상 예외로 거부한다")

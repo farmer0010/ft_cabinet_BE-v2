@@ -1,8 +1,6 @@
 package com.gyeongsan.cabinet.application.kakaonotify;
 
 /**
- * 공지 → 카카오톡 전달 설정.
- *
  * @param channelId 감시할 슬랙 공지 채널 ID
  * @param maxPerPoll 한 번에 보낼 최대 공지 수. 넘치면 오래된 것은 요약 한 줄로 대체한다
  * @param maxHoldHours 수신자가 없어 보류 중인 공지를 붙잡아 두는 최대 시간. 지나면 오래된 공지를 새 수신자에게 쏟아내지 않도록 건너뛴다

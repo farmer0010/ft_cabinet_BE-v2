@@ -68,8 +68,6 @@ public class LogtimeScheduler {
 
         for (User user : allUsers) {
             try {
-                // 기존 동기 처리 및 Thread.sleep(600) 제거
-                // 대신 Redis Stream 에 이벤트를 던지고 백그라운드 워커가 처리하도록 위임
                 java.util.Map<String, String> streamData = new java.util.HashMap<>();
                 streamData.put("userId", String.valueOf(user.getId()));
                 streamData.put("intraId", user.getName());

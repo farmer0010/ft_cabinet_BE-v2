@@ -102,8 +102,6 @@ class AuthControllerRateLimitTest {
         return refreshToken;
     }
 
-    // ---------------------------------------------------------------- 핵심 회귀: 전역 버킷 소진
-
     @Configuration
     static class GlobalBucketConfig {
         @Bean
@@ -172,8 +170,6 @@ class AuthControllerRateLimitTest {
                         });
     }
 
-    // ---------------------------------------------------------------- 검증 전 요청은 아무것도 소모하지 않는다
-
     @Test
     @DisplayName("쿠키가 없거나 서명이 틀린 요청은 Redis·DB 를 건드리지 않고 사용자별 한도도 소모하지 않는다")
     void unverifiedRequestsTouchNothing() {
@@ -193,8 +189,6 @@ class AuthControllerRateLimitTest {
                     .doesNotThrowAnyException();
         }
     }
-
-    // ---------------------------------------------------------------- 사용자별 한도
 
     @Test
     @DisplayName("같은 사용자가 한도를 넘으면 429(TOO_MANY_REQUESTS)이고, 넘은 요청은 Redis 조회까지 가지 않는다")
@@ -285,8 +279,6 @@ class AuthControllerRateLimitTest {
         // 다른 사용자는 영향이 없다.
         controller.linkSocialAccount(principalB, "kakao", request);
     }
-
-    // ---------------------------------------------------------------- X-Forwarded-For 위조
 
     @Test
     @DisplayName("[스푸핑] X-Forwarded-For 값을 바꿔 가며 보내도 사용자별 한도를 우회할 수 없고, 같은 헤더로 다른 사용자를 막을 수도 없다")

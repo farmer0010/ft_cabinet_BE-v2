@@ -113,7 +113,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
         TRANSIENT
     }
 
-    /** 한 번의 실행 동안 한 수신자의 상태. */
     private static final class Session {
         String accessToken;
         boolean unavailable;
@@ -126,7 +125,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
         }
     }
 
-    /** 공지(또는 요약) 한 건을 모든 수신자에게 보낸 결과. */
     private record SendOutcome(int sent, int transientFailures, int permanentFailures) {
         /** 아무도 받지 못했고 재시도로 풀릴 수 있는 실패가 있다 - 커서를 옮기지 않고 다음 주기에 다시 시도한다. */
         boolean mustRetry() {
@@ -519,7 +517,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
         }
     }
 
-    /** 로그에 남기는 실패 원인의 최대 길이. */
     private static final int MAX_REASON_LENGTH = 200;
 
     /**

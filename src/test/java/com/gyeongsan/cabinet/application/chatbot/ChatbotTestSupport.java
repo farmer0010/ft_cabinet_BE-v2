@@ -15,7 +15,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** 챗봇 테스트용 가짜 포트 모음. */
 final class ChatbotTestSupport {
 
     private ChatbotTestSupport() {}

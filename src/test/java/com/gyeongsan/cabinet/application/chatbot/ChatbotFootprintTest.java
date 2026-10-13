@@ -172,7 +172,6 @@ class ChatbotFootprintTest {
                 }
                 double indexMs = ms(System.nanoTime() - indexStart);
 
-                // 순차 질문 지연
                 long[] warm = new long[WARM_RUNS];
                 for (int i = 0; i < WARM_RUNS; i++) {
                     long s = System.nanoTime();
