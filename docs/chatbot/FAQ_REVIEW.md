@@ -2,6 +2,27 @@
 
 자동 생성 파일입니다(`scripts/chatbot/build_seed.py`). 답변은 **초안**이며, 정책 설명이 틀리면 챗봇이 틀린 답을 합니다. 아래 '확인 필요'를 먼저 봐 주세요.
 
+## 2026-10-13 변경
+
+- 운영 정책 페이지(2025-01-26 갱신본) 기준으로 FAQ 를 보강했다. 코드로 강제되지 않는 정책은 정책 문구를 그대로 쓰고 '확인 필요'에 표시했다.
+- 수정: lent-how(1인 1개 명시, eligibility 안내), lent-ticket-get(대여권은 1장까지만 갖게 되는 지급 규칙), lent-period(만료일 확인 위치를 '내 사물함' 페이지로), extend-limit(운영진의 연장권 일시 제한 문장), return-overdue(계속 점유 시 회수 가능 + reclaim-policy 안내), lent-piscine(eligibility 안내).
+- 추가: eligibility(누가 사물함을 쓸 수 있나요), rules-prohibited(사물함에 넣으면 안 되는 물건), reclaim-policy(사물함이 회수되는 경우), damage-loss(사물함이 파손·분실됐어요). 분류 '이용 수칙'을 새로 만들었다.
+- contact 는 담당자/채널이 확정되기 전이라 건드리지 않았다. damage-loss 는 구체 채널 대신 contact 안내로 연결한다.
+
+## 확인 필요 — 정책 페이지 기준 (코드로 강제되지 않음)
+
+아래 항목은 **운영 정책 페이지(2025-01-26 갱신본) 기준이며 코드로 강제되지 않는다.** 정책이 바뀌면 코드 변경 없이 답변이 틀려지므로 정책 페이지가 갱신될 때마다 같이 확인한다.
+
+- `eligibility` (대여): 경산 캠퍼스 계정 제한과 1인 1개는 코드로 강제된다. '공용 자산', '임시 사용 권한' 표현과 '학습 자격' 범위는 운영 정책 페이지(2025-01-26 갱신본) 기준, 코드로 강제되지 않음. lent-piscine 상호 안내.
+- `return-overdue` (반납): 정책 불일치(백로그): 패널티 판정은 '만료 시각이 지나면 즉시'이고 스케줄러/알림은 '만료일 23:59:59까지 유예' — 당일 오후 반납에도 패널티가 붙을 수 있음. 답변에서 '만료일이 지난 뒤'를 어떻게 표현할지 결정 필요. / 2026-10-13 '계속 점유하면 회수될 수 있다' 문장과 reclaim-policy 상호 안내 추가 — 운영 정책 페이지(2025-01-26 갱신본) 기준, 코드로 강제되지 않음.
+- `extend-limit` (연장): 2026-10-13 '운영진이 연장권 사용을 일시 제한할 수 있다' 추가 — 운영 정책 페이지(2025-01-26 갱신본) 기준, 코드로 강제되지 않음. 정책 페이지의 '동일 사물함 기준 5회', '월 5회 사용'은 코드에 없어 쓰지 않았다(코드의 5는 보유·월 구매 한도).
+- `rules-prohibited` (이용 수칙): 운영 정책 페이지(2025-01-26 갱신본) 기준, 코드로 강제되지 않음. 구체적 금지 품목 목록이 따로 있는지 운영진 확인 필요. 개발 보류 평가 세트의 범위 밖 질문 '사물함 안에 음식 보관해도 되나요'는 이 FAQ 추가로 범위 안 질문이 되었다(평가 파일은 고정이라 고치지 않음, 리포트의 '범위 밖 수락' 수치에 정당한 1건으로 잡힘).
+- `reclaim-policy` (이용 수칙): 운영 정책 페이지(2025-01-26 갱신본) 기준, 코드로 강제되지 않음. '휴면 사용자·장기 미사용' 판단 기준(기간)이 정책에 구체적으로 없어 답변에 쓰지 않았다 — 운영진 확인 필요. return-overdue, rules-prohibited 와 상호 안내.
+- `damage-loss` (문의): 운영 정책 페이지(2025-01-26 갱신본) 기준, 코드로 강제되지 않음. 신고 경로는 contact 와 같은 경로를 가리키는데, contact 의 구체 연락처/채널이 아직 정해지지 않아 특정 채널을 쓰지 않고 contact 안내로 연결했다 — contact 확정 후 이 답변도 같이 갱신. '분실'이 무엇을 가리키는지(사물함 비품 등) 정책 원문 확인 필요.
+- `contact` (문의): **건드리지 않았다.** 서비스 문의 슬랙 DM 대상, 시설 고장·파손 신고 슬랙 채널(또는 안내데스크)이 아직 확정되지 않았다. 확정되면 `contact` 와 `damage-loss` 답변을 같이 갱신한다(`damage-loss` 는 구체 채널 대신 contact 안내로 연결해 둠).
+- `lent-ticket-get`: '대여권은 1장까지만 갖게 된다'는 코드가 보유 수를 직접 막는 것이 아니라 지급 규칙(가입 1장, 월간 지급은 미사용 보유 시 생략)의 결과다. 관리자 수동 지급(`AdminItemCoinService.grantItem`)은 수량 제한이 없다.
+- `lent-period`: '내 사물함' 페이지는 프론트 메뉴 이름 기준이며 프론트에서 실제 이름 확인 필요.
+
 ## 2026-10-06 변경
 
 - extend-ticket 과 extend-renew 를 extend-how(대여 기간 연장 방법)로 병합했다. 평가 질문 파일은 그대로 두고 faq-key-aliases.json 으로 옛 키를 읽는다.
@@ -16,38 +37,42 @@
 
 | # | 분류 | seedKey | 대표 질문 | 변형 수 | 근거(코드/설정) | 확인 필요 |
 |---|---|---|---|---|---|---|
-| 1 | 대여 | `lent-how` | 사물함 대여 방법 | 8 | LentApplicationService.startLent, CustomOAuth2UserService.giveWelcomeGift, cabinet.policy.lent-term=31 | 화면 문구(어디서 신청하는지)는 프론트 기준으로 확인 필요. 아이템 설명 DB 문구는 '30일'이지만 설정값은 31일. |
+| 1 | 대여 | `lent-how` | 사물함 대여 방법 | 8 | LentApplicationService.startLent, CustomOAuth2UserService.giveWelcomeGift, cabinet.policy.lent-term=31 | 화면 문구(어디서 신청하는지)는 프론트 기준으로 확인 필요. 아이템 설명 DB 문구는 '30일'이지만 설정값은 31일. / 2026-10-13 '1인 1개' 명시(코드: startLent 의 LENT_ALREADY_EXIST 검증으로 강제됨), eligibility 상호 안내 추가. |
 | 2 | 대여 | `lent-fail` | 사물함 대여가 안 돼요 | 6 | startLent 검증 순서(예약, 패널티, 이미 대여, 상태, 라피신 제한, 대여권), ErrorCode | - |
-| 3 | 대여 | `lent-ticket-get` | 대여권은 어떻게 얻나요 | 8 | giveWelcomeGift, UserDomainService.processLogtimeTransaction, LentTicketRewardPolicy(4800/900분), StoreDomainService(LENT 구매 불가) | 상점 구매 불가 안내 문구(코드)에는 '월 50시간'이라고 적혀 있으나 실제 기준은 80시간(4800분) — 코드 문구가 틀린 것으로 보임. 80시간/15시간은 설정값. |
-| 4 | 대여 | `lent-period` | 대여 기간은 얼마나 되나요 | 6 | cabinet.policy.lent-term=31, extension-term=3, /me expiredAtIso | 설정값(31일). |
+| 3 | 대여 | `lent-ticket-get` | 대여권은 어떻게 얻나요 | 8 | giveWelcomeGift, UserDomainService.processLogtimeTransaction, LentTicketRewardPolicy(4800/900분), StoreDomainService(LENT 구매 불가) | 상점 구매 불가 안내 문구(코드)에는 '월 50시간'이라고 적혀 있으나 실제 기준은 80시간(4800분) — 코드 문구가 틀린 것으로 보임. 80시간/15시간은 설정값. / 2026-10-13 '1장까지' 확인: 코드에 보유 수를 직접 막는 검증은 없다. 가입 보상은 1장이고 월간 지급(processLogtimeTransaction)은 미사용 대여권이 1장 이상이면 생략하므로 통상 경로에서는 1장 상한이 되지만, 관리자 수동 지급(AdminItemCoinService.grantItem)은 수량 제한이 없다. |
+| 4 | 대여 | `lent-period` | 대여 기간은 얼마나 되나요 | 6 | cabinet.policy.lent-term=31, extension-term=3, /me expiredAtIso | 설정값(31일). / 2026-10-13 만료일 확인 위치를 프론트 메뉴 이름인 '내 사물함' 페이지로 표현(메뉴 이름은 프론트 기준으로 확인 필요). |
 | 5 | 대여 | `lent-piscine` | 피시너도 사물함을 쓸 수 있나요 | 6 | validateLentTypePermission, PISCINER_EXTENSION_RESTRICTED, 피시너 식별(cursus 9만 있고 21 없음) | '수영장 사물함' 같은 표현은 평가 질문에서 일부러 엉뚱한 표현을 섞은 것. |
-| 6 | 대여 | `lent-reserve` | 사물함 예약은 어떻게 하나요 | 6 | makeReservation, cancelReservation, RESERVATION_TTL_MINUTES=15 | - |
-| 7 | 반납 | `return-how` | 사물함 반납 방법 | 8 | LentController.endLentCabinet, LentReturnRequest(\d{4}), AiServerAdapter | '공유 비밀번호'는 다음 사용자가 내 정보에서 확인하는 값(previousPassword)으로 보임 — 용어 확인. / 2026-10-06 '사진은 AI 검사용' 명시 + return-ai-fail 상호 안내 추가. |
-| 8 | 반납 | `return-ai-fail` | AI 검사가 계속 실패해요 | 8 | ErrorCode(CABINET_NOT_EMPTY, INVALID_IMAGE, AI_SERVER_ERROR), endLent forceReturn/endLentManual | 강제 반납은 '관리자 승인 요청' 상태(PENDING)로 접수됨. / 2026-10-06 return-how 상호 안내 추가. |
-| 9 | 반납 | `return-overdue` | 대여 기간이 지나서 반납하면 어떻게 되나요 | 6 | LentApplicationService.checkAndApplyPenalty | 정책 불일치(백로그): 패널티 판정은 '만료 시각이 지나면 즉시'이고 스케줄러/알림은 '만료일 23:59:59까지 유예' — 당일 오후 반납에도 패널티가 붙을 수 있음. 답변에서 '만료일이 지난 뒤'를 어떻게 표현할지 결정 필요. |
-| 10 | 연장 | `extend-how` | 연장권은 어떻게 쓰나요 | 8 | useExtension(extension-term=3, extension-price=400), manualRenew(31일, 패널티 검증), 피시너 연장 제한(PISCINER_EXTENSION_RESTRICTED) | 2026-10-06 extend-ticket + extend-renew 병합. 가격(400)·기간(3일/31일)은 설정값. 수동 연장의 패널티 제한 문구는 원 답변(패널티 기간·피시너 불가)을 합친 것이며, 연장권이 패널티 기간에 쓸 수 있는지는 코드 확인 필요. |
-| 11 | 연장 | `extend-auto` | 자동 연장이 뭔가요 | 6 | LentScheduler.autoExtension(01:40), updateAutoExtensionStatus | '대여권이 자동으로 사라졌어요' 질문은 자동 연장으로 대여권이 소모된 경우를 가정. |
-| 12 | 연장 | `extend-limit` | 연장권을 몇 개까지 살 수 있나요 | 6 | StoreDomainService MAX_EXTENSION_COUNT=5, EXTENSION_ITEM_LIMIT_EXCEEDED/PURCHASE_LIMIT | - |
-| 13 | 연장 | `alarm-timing` | 반납 알림은 언제 오나요 | 6 | LentScheduler.checkExpirationImminent, checkOverdue(sendOverdueAlarm 1/3/7/14+) | 슬랙 사용자명이 인트라 ID와 달라 DM이 안 가는 사용자는 알림을 못 받음. |
-| 14 | 이사 | `swap-how` | 사물함 이사는 어떻게 하나요 | 8 | useSwap, processSwapTransaction, makeReservation(swap ticket) | - |
-| 15 | 이사 | `swap-conditions` | 이사가 안 돼요 | 8 | processSwapTransaction 검증(OVERDUE_USER_CANNOT_SWAP, PENALTY_USER, SAME_CABINET_SWAP, 예약 확인) | - |
-| 16 | 이사 | `swap-expiry` | 이사하면 대여 기간이 어떻게 되나요 | 6 | processSwapTransaction: newLent expiredAt = oldLent.getExpiredAt() | - |
-| 17 | 패널티 | `penalty-what` | 패널티가 뭔가요 | 6 | checkAndApplyPenalty, startLent/manualRenew/processSwapTransaction 의 PENALTY_USER 검증 | - |
-| 18 | 패널티 | `penalty-decay` | 패널티는 언제 풀리나요 | 6 | LentScheduler.penaltyDecay(0 0 0 * * *) | - |
-| 19 | 패널티 | `penalty-exempt` | 패널티 감면권은 어떻게 쓰나요 | 6 | usePenaltyExemption(decayPenalty 1일), cabinet.items.penalty-exemption-price=300 | 가격(300)은 설정값. 감면 효과는 '1일'(코드 기준) — 아이템 설명 문구('패널티를 감면합니다')와 확인. |
-| 20 | 씨앗·아이템 | `coin-earn` | 씨앗은 어떻게 얻나요 | 8 | UserDomainService.doAttendance(100, 20회=2000) | 수박 이벤트에서의 씨앗 획득 방식은 확인하지 않음 — 문장은 '오간다'로만 표현. |
-| 21 | 씨앗·아이템 | `item-list` | 상점에서 뭘 살 수 있나요 | 6 | cabinet.items.*, ItemPriceInitializer, StoreDomainService | 가격은 설정값이며 재시작마다 설정값으로 DB를 덮어씀 — 가격 변경 시 이 FAQ도 수정 필요(하드코딩 위험). |
-| 22 | 수박 이벤트 | `watermelon-what` | 수박씨 강화 이벤트가 뭔가요 | 8 | README 10 (WatermelonConfig.MAX_LEVEL) | 확률표는 코드(WatermelonConfig) 기준이며 FAQ에는 싣지 않음. 최대 10강은 README 기준. |
-| 23 | 수박 이벤트 | `watermelon-items` | 비료는 뭐가 있나요 | 6 | README 10 | - |
-| 24 | 계정·로그인 | `social-link` | 카카오나 구글 계정을 연동하려면 | 8 | OauthLinkService, /v4/auth/link/{provider}, CustomOAuth2UserService.handleSocialLogin, OAUTH_ALREADY_LINKED* | 연동 메뉴 위치(화면)는 프론트 기준으로 확인 필요. 2026-10-06 역할 분리: 이 FAQ는 '연동 방법과 소셜 로그인', 로그인 실패 원인은 login-denied. |
-| 25 | 계정·로그인 | `login-denied` | 로그인이 안 돼요 | 8 | CustomOAuth2UserService(allowedEmailDomain, bannedUserRepository) | 2026-10-06 역할 분리: 이 FAQ는 '로그인 실패 원인'(캠퍼스 제한·미연동·이용 제한). 개발 평가 세트의 '카카오로 로그인이 안 돼요'(expected=social-link)는 이 FAQ 쪽이 더 맞는 질문이라 라벨과 어긋남 — 평가 라벨은 바꾸지 않음. |
-| 26 | 문의 | `contact` | 오류가 났을 때 어디에 문의하나요 | 8 | ErrorCode.AI_SERVER_ERROR 문구, 슬랙 오류제보 채널(오류제보 → 관리자 DM 전달 기능) | 2026-10-06 사물함 고장·파손 신고 포함(운영 방식 확인: 그 채널에 올리면 관리자 DM 으로 전달). 채널 이름/연락처 구체화 필요. |
+| 6 | 대여 | `eligibility` | 누가 사물함을 쓸 수 있나요 | 6 | CustomOAuth2UserService(allowedEmailDomain: 경산 캠퍼스 계정만 로그인), startLent LENT_ALREADY_EXIST(1인 1개), validateLentTypePermission | 경산 캠퍼스 계정 제한과 1인 1개는 코드로 강제된다. '공용 자산', '임시 사용 권한' 표현과 '학습 자격' 범위는 운영 정책 페이지(2025-01-26 갱신본) 기준, 코드로 강제되지 않음. lent-piscine 상호 안내. |
+| 7 | 대여 | `lent-reserve` | 사물함 예약은 어떻게 하나요 | 6 | makeReservation, cancelReservation, RESERVATION_TTL_MINUTES=15 | - |
+| 8 | 반납 | `return-how` | 사물함 반납 방법 | 8 | LentController.endLentCabinet, LentReturnRequest(\d{4}), AiServerAdapter | '공유 비밀번호'는 다음 사용자가 내 정보에서 확인하는 값(previousPassword)으로 보임 — 용어 확인. / 2026-10-06 '사진은 AI 검사용' 명시 + return-ai-fail 상호 안내 추가. |
+| 9 | 반납 | `return-ai-fail` | AI 검사가 계속 실패해요 | 8 | ErrorCode(CABINET_NOT_EMPTY, INVALID_IMAGE, AI_SERVER_ERROR), endLent forceReturn/endLentManual | 강제 반납은 '관리자 승인 요청' 상태(PENDING)로 접수됨. / 2026-10-06 return-how 상호 안내 추가. |
+| 10 | 반납 | `return-overdue` | 대여 기간이 지나서 반납하면 어떻게 되나요 | 6 | LentApplicationService.checkAndApplyPenalty | 정책 불일치(백로그): 패널티 판정은 '만료 시각이 지나면 즉시'이고 스케줄러/알림은 '만료일 23:59:59까지 유예' — 당일 오후 반납에도 패널티가 붙을 수 있음. 답변에서 '만료일이 지난 뒤'를 어떻게 표현할지 결정 필요. / 2026-10-13 '계속 점유하면 회수될 수 있다' 문장과 reclaim-policy 상호 안내 추가 — 운영 정책 페이지(2025-01-26 갱신본) 기준, 코드로 강제되지 않음. |
+| 11 | 연장 | `extend-how` | 연장권은 어떻게 쓰나요 | 8 | useExtension(extension-term=3, extension-price=400), manualRenew(31일, 패널티 검증), 피시너 연장 제한(PISCINER_EXTENSION_RESTRICTED) | 2026-10-06 extend-ticket + extend-renew 병합. 가격(400)·기간(3일/31일)은 설정값. 수동 연장의 패널티 제한 문구는 원 답변(패널티 기간·피시너 불가)을 합친 것이며, 연장권이 패널티 기간에 쓸 수 있는지는 코드 확인 필요. |
+| 12 | 연장 | `extend-auto` | 자동 연장이 뭔가요 | 6 | LentScheduler.autoExtension(01:40), updateAutoExtensionStatus | '대여권이 자동으로 사라졌어요' 질문은 자동 연장으로 대여권이 소모된 경우를 가정. |
+| 13 | 연장 | `extend-limit` | 연장권을 몇 개까지 살 수 있나요 | 6 | StoreDomainService MAX_EXTENSION_COUNT=5, EXTENSION_ITEM_LIMIT_EXCEEDED/PURCHASE_LIMIT | 2026-10-13 '운영진이 연장권 사용을 일시 제한할 수 있다' 추가 — 운영 정책 페이지(2025-01-26 갱신본) 기준, 코드로 강제되지 않음. 정책 페이지의 '동일 사물함 기준 5회', '월 5회 사용'은 코드에 없어 쓰지 않았다(코드의 5는 보유·월 구매 한도). |
+| 14 | 연장 | `alarm-timing` | 반납 알림은 언제 오나요 | 6 | LentScheduler.checkExpirationImminent, checkOverdue(sendOverdueAlarm 1/3/7/14+) | 슬랙 사용자명이 인트라 ID와 달라 DM이 안 가는 사용자는 알림을 못 받음. |
+| 15 | 이사 | `swap-how` | 사물함 이사는 어떻게 하나요 | 8 | useSwap, processSwapTransaction, makeReservation(swap ticket) | - |
+| 16 | 이사 | `swap-conditions` | 이사가 안 돼요 | 8 | processSwapTransaction 검증(OVERDUE_USER_CANNOT_SWAP, PENALTY_USER, SAME_CABINET_SWAP, 예약 확인) | - |
+| 17 | 이사 | `swap-expiry` | 이사하면 대여 기간이 어떻게 되나요 | 6 | processSwapTransaction: newLent expiredAt = oldLent.getExpiredAt() | - |
+| 18 | 패널티 | `penalty-what` | 패널티가 뭔가요 | 6 | checkAndApplyPenalty, startLent/manualRenew/processSwapTransaction 의 PENALTY_USER 검증 | - |
+| 19 | 패널티 | `penalty-decay` | 패널티는 언제 풀리나요 | 6 | LentScheduler.penaltyDecay(0 0 0 * * *) | - |
+| 20 | 패널티 | `penalty-exempt` | 패널티 감면권은 어떻게 쓰나요 | 6 | usePenaltyExemption(decayPenalty 1일), cabinet.items.penalty-exemption-price=300 | 가격(300)은 설정값. 감면 효과는 '1일'(코드 기준) — 아이템 설명 문구('패널티를 감면합니다')와 확인. |
+| 21 | 씨앗·아이템 | `coin-earn` | 씨앗은 어떻게 얻나요 | 8 | UserDomainService.doAttendance(100, 20회=2000) | 수박 이벤트에서의 씨앗 획득 방식은 확인하지 않음 — 문장은 '오간다'로만 표현. |
+| 22 | 씨앗·아이템 | `item-list` | 상점에서 뭘 살 수 있나요 | 6 | cabinet.items.*, ItemPriceInitializer, StoreDomainService | 가격은 설정값이며 재시작마다 설정값으로 DB를 덮어씀 — 가격 변경 시 이 FAQ도 수정 필요(하드코딩 위험). |
+| 23 | 수박 이벤트 | `watermelon-what` | 수박씨 강화 이벤트가 뭔가요 | 8 | README 10 (WatermelonConfig.MAX_LEVEL) | 확률표는 코드(WatermelonConfig) 기준이며 FAQ에는 싣지 않음. 최대 10강은 README 기준. |
+| 24 | 수박 이벤트 | `watermelon-items` | 비료는 뭐가 있나요 | 6 | README 10 | - |
+| 25 | 계정·로그인 | `social-link` | 카카오나 구글 계정을 연동하려면 | 8 | OauthLinkService, /v4/auth/link/{provider}, CustomOAuth2UserService.handleSocialLogin, OAUTH_ALREADY_LINKED* | 연동 메뉴 위치(화면)는 프론트 기준으로 확인 필요. 2026-10-06 역할 분리: 이 FAQ는 '연동 방법과 소셜 로그인', 로그인 실패 원인은 login-denied. |
+| 26 | 계정·로그인 | `login-denied` | 로그인이 안 돼요 | 8 | CustomOAuth2UserService(allowedEmailDomain, bannedUserRepository) | 2026-10-06 역할 분리: 이 FAQ는 '로그인 실패 원인'(캠퍼스 제한·미연동·이용 제한). 개발 평가 세트의 '카카오로 로그인이 안 돼요'(expected=social-link)는 이 FAQ 쪽이 더 맞는 질문이라 라벨과 어긋남 — 평가 라벨은 바꾸지 않음. |
+| 27 | 이용 수칙 | `rules-prohibited` | 사물함에 넣으면 안 되는 물건 | 8 | 운영 정책 페이지(코드에 해당 검증 없음) | 운영 정책 페이지(2025-01-26 갱신본) 기준, 코드로 강제되지 않음. 구체적 금지 품목 목록이 따로 있는지 운영진 확인 필요. 개발 보류 평가 세트의 범위 밖 질문 '사물함 안에 음식 보관해도 되나요'는 이 FAQ 추가로 범위 안 질문이 되었다(평가 파일은 고정이라 고치지 않음, 리포트의 '범위 밖 수락' 수치에 정당한 1건으로 잡힘). |
+| 28 | 이용 수칙 | `reclaim-policy` | 사물함이 회수되는 경우 | 8 | 운영 정책 페이지(코드에 회수 자동화 없음 — 스케줄러는 연체 알림과 패널티만 다룬다) | 운영 정책 페이지(2025-01-26 갱신본) 기준, 코드로 강제되지 않음. '휴면 사용자·장기 미사용' 판단 기준(기간)이 정책에 구체적으로 없어 답변에 쓰지 않았다 — 운영진 확인 필요. return-overdue, rules-prohibited 와 상호 안내. |
+| 29 | 문의 | `contact` | 오류가 났을 때 어디에 문의하나요 | 8 | ErrorCode.AI_SERVER_ERROR 문구, 슬랙 오류제보 채널(오류제보 → 관리자 DM 전달 기능) | 2026-10-06 사물함 고장·파손 신고 포함(운영 방식 확인: 그 채널에 올리면 관리자 DM 으로 전달). 채널 이름/연락처 구체화 필요. |
+| 30 | 문의 | `damage-loss` | 사물함이 파손·분실됐어요 | 6 | 운영 정책 페이지(코드에 책임 부과 로직 없음) | 운영 정책 페이지(2025-01-26 갱신본) 기준, 코드로 강제되지 않음. 신고 경로는 contact 와 같은 경로를 가리키는데, contact 의 구체 연락처/채널이 아직 정해지지 않아 특정 채널을 쓰지 않고 contact 안내로 연결했다 — contact 확정 후 이 답변도 같이 갱신. '분실'이 무엇을 가리키는지(사물함 비품 등) 정책 원문 확인 필요. |
 
 ## 답변 전문
 
 ### 사물함 대여 방법 (`lent-how`, 대여)
 
-사물함 목록에서 사용 가능한 사물함을 골라 대여를 신청하면 됩니다. 대여권이 1장 필요하고(신규 가입 시 1장 지급), 패널티 기간이 아니어야 하며, 이미 대여 중인 사물함이 없어야 합니다. 대여 기간은 31일입니다.
+사물함 목록에서 사용 가능한 사물함을 골라 대여를 신청하면 됩니다. 사물함은 1인 1개만 대여할 수 있어서, 이미 대여 중인 사물함이 있으면 새로 빌릴 수 없습니다. 대여권이 1장 필요하고(신규 가입 시 1장 지급), 패널티 기간이 아니어야 합니다. 대여 기간은 31일입니다. 누가 사물함을 쓸 수 있는지는 '누가 사물함을 쓸 수 있나요' 안내를 참고하세요.
 
 ### 사물함 대여가 안 돼요 (`lent-fail`, 대여)
 
@@ -55,15 +80,19 @@
 
 ### 대여권은 어떻게 얻나요 (`lent-ticket-get`, 대여)
 
-대여권은 ① 처음 가입할 때 1장, ② 매월 1일에 지난달 로그타임이 80시간 이상일 때(트센은 15시간 이상) 1장 지급됩니다. 이미 사용하지 않은 대여권이 있으면 그 달에는 추가 지급되지 않습니다. 상점에서는 살 수 없습니다.
+대여권은 ① 처음 가입할 때 1장, ② 매월 1일에 지난달 로그타임이 80시간 이상일 때(트센은 15시간 이상) 1장 지급됩니다. 대여권은 사용하지 않은 것을 1장까지만 갖게 되며, 이미 사용하지 않은 대여권이 있으면 그 달의 월간 지급은 생략됩니다. 상점에서는 살 수 없습니다.
 
 ### 대여 기간은 얼마나 되나요 (`lent-period`, 대여)
 
-대여 기간은 31일입니다. 만료일은 내 정보에서 확인할 수 있고, 연장권(3일), 대여권을 쓰는 수동 연장(31일), 자동 연장으로 기간을 늘릴 수 있습니다.
+대여 기간은 31일입니다. 만료일은 '내 사물함' 페이지에서 확인할 수 있고, 연장권(3일), 대여권을 쓰는 수동 연장(31일), 자동 연장으로 기간을 늘릴 수 있습니다.
 
 ### 피시너도 사물함을 쓸 수 있나요 (`lent-piscine`, 대여)
 
-피시너는 라피신 전용 사물함만 대여할 수 있고, 라피신 전용 사물함은 피시너만 사용할 수 있습니다. 또 피시너는 대여 기간을 연장할 수 없습니다.
+피시너는 라피신 전용 사물함만 대여할 수 있고, 라피신 전용 사물함은 피시너만 사용할 수 있습니다. 또 피시너는 대여 기간을 연장할 수 없습니다. 대여 자격 전반은 '누가 사물함을 쓸 수 있나요' 안내를 참고하세요.
+
+### 누가 사물함을 쓸 수 있나요 (`eligibility`, 대여)
+
+42경산 학습 자격이 있는 사용자만 사물함을 쓸 수 있고, 1인 1개만 대여할 수 있습니다. 사물함은 개인 소유물이 아니라 모두가 함께 쓰는 공용 자산이며, 대여는 임시로 사용할 수 있는 권한을 받는 것입니다. 피시너는 쓸 수 있는 사물함과 연장에 제한이 있으니 '피시너도 사물함을 쓸 수 있나요' 안내를 참고하세요.
 
 ### 사물함 예약은 어떻게 하나요 (`lent-reserve`, 대여)
 
@@ -79,7 +108,7 @@
 
 ### 대여 기간이 지나서 반납하면 어떻게 되나요 (`return-overdue`, 반납)
 
-대여 만료일이 지난 뒤 반납하면 연체로 처리되어 패널티가 부과됩니다. 패널티는 연체일 × 3일이며(연체일이 0일로 계산돼도 최소 3일), 반납할 때 한 번에 부과됩니다.
+대여 만료일이 지난 뒤 반납하면 연체로 처리되어 패널티가 부과됩니다. 패널티는 연체일 × 3일이며(연체일이 0일로 계산돼도 최소 3일), 반납할 때 한 번에 부과됩니다. 만료 후에도 반납하지 않고 계속 사용하면 사물함이 회수될 수 있으니, 회수 기준은 '사물함이 회수되는 경우' 안내를 참고하세요.
 
 ### 연장권은 어떻게 쓰나요 (`extend-how`, 연장)
 
@@ -91,7 +120,7 @@
 
 ### 연장권을 몇 개까지 살 수 있나요 (`extend-limit`, 연장)
 
-연장권은 사용하지 않은 것을 최대 5개까지 보유할 수 있고, 한 달에 최대 5개까지 구매할 수 있습니다.
+연장권은 사용하지 않은 것을 최대 5개까지 보유할 수 있고, 한 달에 최대 5개까지 구매할 수 있습니다. 다만 사물함 수요에 따라 운영진이 연장권 사용을 일시적으로 제한할 수 있습니다.
 
 ### 반납 알림은 언제 오나요 (`alarm-timing`, 연장)
 
@@ -145,7 +174,19 @@
 
 로그인이 안 되는 흔한 이유는 다음과 같습니다. ① 42경산 캠퍼스 계정(경산 캠퍼스 이메일)이 아님: 이 서비스는 경산 캠퍼스 계정만 사용할 수 있습니다. ② 카카오·구글로 로그인하려는데 미리 연동하지 않음: 먼저 42 인트라로 로그인해 소셜 계정을 연동한 뒤 사용해 주세요(연동 방법은 소셜 로그인 연동 안내 참고). ③ 서비스 이용이 제한되었다는 안내가 나옴: 관리자에게 문의해 주세요.
 
+### 사물함에 넣으면 안 되는 물건 (`rules-prohibited`, 이용 수칙)
+
+사물함은 개인 소지품을 보관하는 용도로만 사용할 수 있습니다. 다음 물품은 넣을 수 없습니다. ① 음식물 ② 악취가 나거나 오염·부패할 우려가 있는 물품 ③ 화재·안전사고 위험이 있는 물품. 이를 어긴 것이 적발되면 사물함이 회수되고 이용이 제한될 수 있습니다. 회수 기준은 '사물함이 회수되는 경우' 안내를 참고하세요.
+
+### 사물함이 회수되는 경우 (`reclaim-policy`, 이용 수칙)
+
+다음 경우에는 사물함이 회수될 수 있습니다. ① 대여 기간이 끝난 뒤에도 반납하지 않고 계속 점유할 때 ② 이용 수칙을 어긴 것이 적발됐을 때 ③ 휴면 사용자이거나 오랫동안 쓰지 않는 것으로 판단될 때. 운영진은 사물함을 임의로 점검할 수 있고, 점검과 회수 공지는 사후에 이루어질 수 있습니다. 회수된 뒤에는 이용이 제한될 수 있습니다. 넣으면 안 되는 물건은 '사물함에 넣으면 안 되는 물건' 안내를, 기간이 지난 뒤 반납할 때의 패널티는 '대여 기간이 지나서 반납하면 어떻게 되나요' 안내를 참고하세요.
+
 ### 오류가 났을 때 어디에 문의하나요 (`contact`, 문의)
 
 서비스 오류나 문의, 사물함 고장·파손 신고는 사물함 오류제보/문의 슬랙 채널에 남겨 주세요. 채널에 남긴 글은 관리자가 확인합니다. 슬랙을 쓰기 어렵다면 홈페이지에 공지된 연락처로 알려 주세요.
+
+### 사물함이 파손·분실됐어요 (`damage-loss`, 문의)
+
+사물함이 파손되었거나 분실된 것을 알게 되면 즉시 '오류가 났을 때 어디에 문의하나요' 안내에 나온 신고 경로로 알려 주세요. 고의이거나 중대한 과실로 파손·분실한 경우에는 운영진의 판단에 따라 책임이 부과될 수 있습니다.
 
