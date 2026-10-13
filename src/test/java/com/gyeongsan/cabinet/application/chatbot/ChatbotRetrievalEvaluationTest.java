@@ -471,6 +471,13 @@ class ChatbotRetrievalEvaluationTest {
                 SetResult devResult = ChatbotEvalSupport.probe(faqs, all, embedder, dev);
                 SetResult holdoutResult = ChatbotEvalSupport.probe(faqs, all, embedder, holdout);
 
+                for (var pair : java.util.List.of(java.util.Map.entry("dev", devResult), java.util.Map.entry("holdout", holdoutResult))) {
+                    for (var o : pair.getValue().out()) {
+                        if (o.s1() >= 0.90) {
+                            System.out.println(String.format(Locale.ROOT, "[OOSDIAG] %s | %s | s1=%.3f s2=%.3f margin=%.3f", pair.getKey(), o.question(), o.s1(), o.s2(), o.margin()));
+                        }
+                    }
+                }
                 report.append(String.format(Locale.ROOT, "### %s%n%n", candidate.id()));
                 report.append(report(candidate.id(), candidate.required(), "개발 세트", devResult));
                 report.append(
