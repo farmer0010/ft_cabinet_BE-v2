@@ -19,7 +19,6 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-/** 네트워크 없이 WebClient 교환 함수를 가로채, 요청 모양과 응답 해석을 확인한다. */
 class FtApiManagerCursusTest {
 
     private final List<ClientRequest> requests = new ArrayList<>();

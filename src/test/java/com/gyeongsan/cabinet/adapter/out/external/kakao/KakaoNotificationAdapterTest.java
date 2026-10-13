@@ -23,7 +23,6 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-/** 실제 네트워크 없이 카카오 응답(합성 데이터)을 흉내 내 요청 모양과 오류 해석을 확인한다. */
 class KakaoNotificationAdapterTest {
 
     private final List<ClientRequest> requests = new ArrayList<>();

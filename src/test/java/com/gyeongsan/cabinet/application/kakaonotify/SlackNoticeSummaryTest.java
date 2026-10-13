@@ -43,7 +43,6 @@ class SlackNoticeSummaryTest {
         return new AesGcmTokenCipher(Base64.getEncoder().encodeToString(key));
     }
 
-    /** 호출 기록과 응답을 정해 둘 수 있는 가짜 요약기. */
     static class FakeSummarizer implements NoticeSummarizerPort {
         final List<String> texts = new ArrayList<>();
         final List<Integer> limits = new ArrayList<>();
