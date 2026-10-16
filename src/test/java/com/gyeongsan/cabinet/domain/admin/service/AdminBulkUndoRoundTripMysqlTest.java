@@ -31,6 +31,7 @@ import com.gyeongsan.cabinet.domain.user.model.UserRole;
 import com.gyeongsan.cabinet.global.exception.UndoRejectedException;
 import com.gyeongsan.cabinet.support.MariaDbDriverMySqlContainer;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +73,19 @@ class AdminBulkUndoRoundTripMysqlTest {
         @Override
         public Optional<Long> getReservedUserId(Integer visibleNum) {
             return Optional.ofNullable(reservations.get(visibleNum));
+        }
+
+        @Override
+        public Map<Integer, Long> getReservedUserIds(Collection<Integer> visibleNums) {
+            Map<Integer, Long> found = new HashMap<>();
+            visibleNums.forEach(
+                    n -> Optional.ofNullable(reservations.get(n)).ifPresent(u -> found.put(n, u)));
+            return found;
+        }
+
+        @Override
+        public Optional<Long> getCabinetReservationTtlSeconds(Integer visibleNum) {
+            return Optional.empty();
         }
 
         @Override

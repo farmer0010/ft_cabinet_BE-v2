@@ -16,11 +16,17 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -36,6 +42,7 @@ public class CabinetDomainService implements CabinetQueryUseCase {
         List<Long> cabinetIds = cabinets.stream().map(Cabinet::getId).collect(Collectors.toList());
 
         List<LentHistory> activeLents = lentRepository.findAllActiveLentByCabinetIds(cabinetIds);
+        Map<Integer, Long> reservedUserIds = findReservedUserIds(cabinets);
 
         return cabinets.stream()
                 .map(
@@ -69,6 +76,8 @@ public class CabinetDomainService implements CabinetQueryUseCase {
                                 userName = "*****";
                             }
 
+                            Long reservedBy = reservedUserIds.get(cabinet.getVisibleNum());
+
                             return CabinetListResponseDto.builder()
                                     .cabinetId(cabinet.getId())
                                     .visibleNum(cabinet.getVisibleNum())
@@ -81,9 +90,36 @@ public class CabinetDomainService implements CabinetQueryUseCase {
                                     .lentStartedAt(startedAt)
                                     .lentExpiredAt(expiredAt)
                                     .daysRemaining(daysRemaining)
+                                    .isReserved(reservedBy != null)
+                                    .isReservedByMe(isMine(reservedBy, userPrincipal))
                                     .build();
                         })
                 .collect(Collectors.toList());
+    }
+
+    /** 대여 가능한 사물함만 한 번에 조회한다. 예약은 보조 정보라 Redis 가 실패해도 목록은 내려가야 하므로 예약이 없는 것으로 본다. */
+    private Map<Integer, Long> findReservedUserIds(List<Cabinet> cabinets) {
+        Set<Integer> availableNums =
+                cabinets.stream()
+                        .filter(c -> c.getStatus() == CabinetStatus.AVAILABLE)
+                        .map(Cabinet::getVisibleNum)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+        if (availableNums.isEmpty()) {
+            return Map.of();
+        }
+        try {
+            return reservationPort.getReservedUserIds(availableNums);
+        } catch (RuntimeException e) {
+            log.warn("사물함 예약 목록 조회 실패 - 원인: {}", e.toString());
+            return Map.of();
+        }
+    }
+
+    private static boolean isMine(Long reservedBy, UserPrincipal userPrincipal) {
+        return reservedBy != null
+                && userPrincipal != null
+                && reservedBy.equals(userPrincipal.getUserId());
     }
 
     @Override
@@ -152,13 +188,22 @@ public class CabinetDomainService implements CabinetQueryUseCase {
             if (!"-".equals(prevName)) prevName = "*****";
         }
 
-        Boolean isReservedByMe = false;
-        if (userPrincipal != null) {
-            var reservedUserId = reservationPort.getReservedUserId(cabinet.getVisibleNum());
-            if (reservedUserId.isPresent()
-                    && reservedUserId.get().equals(userPrincipal.getUserId())) {
-                isReservedByMe = true;
-            }
+        boolean isReserved = false;
+        boolean isReservedByMe = false;
+        Long reservationRemainingSeconds = null;
+        try {
+            Optional<Long> reservedUserId =
+                    reservationPort.getReservedUserId(cabinet.getVisibleNum());
+            Optional<Long> remaining =
+                    reservedUserId.isPresent()
+                            ? reservationPort.getCabinetReservationTtlSeconds(
+                                    cabinet.getVisibleNum())
+                            : Optional.empty();
+            isReserved = reservedUserId.isPresent();
+            isReservedByMe = isMine(reservedUserId.orElse(null), userPrincipal);
+            reservationRemainingSeconds = remaining.orElse(null);
+        } catch (RuntimeException e) {
+            log.warn("사물함 예약 상태 조회 실패 - Cabinet: {}, 원인: {}", cabinetId, e.toString());
         }
 
         return CabinetDetailResponseDto.builder()
@@ -174,7 +219,9 @@ public class CabinetDomainService implements CabinetQueryUseCase {
                 .daysRemaining(daysRemaining)
                 .previousUserName(prevName)
                 .previousEndedAt(prevEnd)
+                .isReserved(isReserved)
                 .isReservedByMe(isReservedByMe)
+                .reservationRemainingSeconds(reservationRemainingSeconds)
                 .build();
     }
 
