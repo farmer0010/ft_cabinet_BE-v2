@@ -83,7 +83,6 @@ class RedisConnectionPolicyTest {
             assertThat(RedisConnectionPolicy.isLoopback(host)).as(host).isFalse();
         }
         assertThat(RedisConnectionPolicy.isLoopback(null)).isFalse();
-        // 루프백 대역 전체는 인정한다.
         assertThat(RedisConnectionPolicy.isLoopback("127.0.0.1")).isTrue();
         assertThat(RedisConnectionPolicy.isLoopback("127.255.255.254")).isTrue();
     }

@@ -18,10 +18,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * 로컬/데모용 가짜 시드({@code scripts/db/seed/demo-seed.sql})가 운영과 같은 Flyway 스키마(V1~V6)에 실제로 들어가는지, 여러 번
- * 실행해도 같은지 확인한다. 시드가 스키마와 어긋나면 데모 스택이 조용히 빈 채로 뜨는 대신 이 테스트가 실패한다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class DemoSeedMysqlTest {
 

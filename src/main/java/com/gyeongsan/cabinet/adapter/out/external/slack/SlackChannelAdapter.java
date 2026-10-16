@@ -17,10 +17,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-/**
- * 슬랙 Web API 로 채널의 최상위 메시지를 읽는다(conversations.history). 필요한 권한: 공개 채널 channels:history, 비공개 채널
- * groups:history 이며 봇이 채널에 초대되어 있어야 한다. 스레드 답글은 읽지 않는다.
- */
 @Component
 @RequiredArgsConstructor
 @Log4j2
@@ -55,14 +51,12 @@ public class SlackChannelAdapter implements SlackChannelPort {
                 break;
             }
             if (page >= MAX_PAGES) {
-                // 최신 쪽부터 가져오므로, 한도를 넘으면 가장 오래된 일부를 못 가져온다.
                 truncated = true;
                 break;
             }
             pageCursor = next;
         }
 
-        // 응답은 최신순이다. 오래된 것부터 처리하도록 뒤집는다.
         Collections.reverse(collected);
         return new SlackHistory(List.copyOf(collected), truncated);
     }
@@ -99,7 +93,6 @@ public class SlackChannelAdapter implements SlackChannelPort {
                 b -> {
                     b.queryParam("channel", channelId).queryParam("limit", limit);
                     if (oldestTs != null) {
-                        // inclusive 기본값 false: 커서 자신은 제외한다.
                         b.queryParam("oldest", oldestTs);
                     }
                     if (pageCursor != null) {
@@ -136,7 +129,6 @@ public class SlackChannelAdapter implements SlackChannelPort {
         }
 
         if (body == null || !body.path("ok").asBoolean(false)) {
-            // 오류 코드만 기록한다(토큰 등 민감한 값은 응답에 없다).
             String error = body == null ? "빈 응답" : body.path("error").asText("unknown");
             throw new SlackChannelException(method + " 실패: " + error + hint(error));
         }

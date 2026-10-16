@@ -4,7 +4,6 @@ import com.gyeongsan.cabinet.adapter.in.web.admin.dto.UndoRejection;
 import java.util.stream.Collectors;
 import lombok.Getter;
 
-/** Undo 가 거부되었음을 알린다(409). 거부된 요청은 아무 변경도 남기지 않는다. */
 @Getter
 public class UndoRejectedException extends RuntimeException {
 

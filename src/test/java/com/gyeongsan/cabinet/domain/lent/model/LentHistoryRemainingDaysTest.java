@@ -26,7 +26,6 @@ class LentHistoryRemainingDaysTest {
     @Test
     @DisplayName("시각과 무관하게 만료일의 날짜로만 남은 일수를 센다")
     void countsCalendarDaysIgnoringTimeOfDay() {
-        // 만료 시각이 자정 직전이어도, 직후여도 같은 날짜면 같은 일수다.
         assertThat(lentExpiringAt(TODAY.plusDays(3).atStartOfDay()).calculateRemainingDays(TODAY))
                 .isEqualTo(3);
         assertThat(

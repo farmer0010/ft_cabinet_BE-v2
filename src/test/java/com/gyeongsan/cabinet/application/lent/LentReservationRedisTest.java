@@ -45,10 +45,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * 실제 LentApplicationService 와 실제 Redis 로 예약 흐름을 확인한다. 나머지 의존은 목이다. 분산락 AOP 는 스프링 없이 직접 호출하므로 적용되지
- * 않으며, 그래서 이 테스트는 락이 없어도 Redis 쪽 원자성만으로 예약이 하나만 남는다는 것을 보여 준다. Docker 가 없으면 건너뛴다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class LentReservationRedisTest {
 
@@ -235,7 +231,6 @@ class LentReservationRedisTest {
             barrier.await();
             service.makeReservation(USER_ID, visibleNum);
         } catch (ServiceException ignored) {
-            // 동시 요청 중 하나가 "이미 예약 중" 등으로 거부되는 것은 정상이다.
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

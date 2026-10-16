@@ -67,15 +67,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * 감사 M-8 재현: Undo 가 락을 잡기 전에 일반 SELECT(감사 로그 조회)로 REPEATABLE READ 스냅샷을 잡아 두면, 락을 얻은 뒤의 "이 사용자가 지금
- * 활성 대여를 가졌나" 검사가 스냅샷 시점의 오래된 상태를 본다. 그 사이 같은 사용자가 다른 사물함을 새로 빌려 커밋했어도 못 보고 이전 대여를 되살려, 한 사용자에게 활성
- * 대여가 2건 생긴다.
- *
- * <p>실제 MySQL 8.0/8.4(운영 MariaDB 와 같은 드라이버) + 실제 Redis + 실제 서비스 코드(일괄 변경 → Undo, 대여는 {@code
- * startLent})로 돌린다. 두 가지로 만든다: (1) 사용자 락을 쥔 동시 대여를 흉내 낸 '락 대기 중 커밋' — 테스트 전용 훅 없이 자연스러운 타이밍, (2) 감사
- * 로그를 읽은 직후 멈추는 훅으로 결정적 재현. Docker 가 없으면 건너뛴다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class AdminUndoSnapshotMysqlTest {
 
@@ -163,7 +154,6 @@ class AdminUndoSnapshotMysqlTest {
             return port;
         }
 
-        /** 감사 로그 포트. 훅이 걸린 스레드에서는 로그를 읽은 직후(= 스냅샷이 잡힌 뒤) 멈춘다. */
         @Bean
         AdminActionLogPort adminActionLogPort(
                 AdminActionLogJpaRepository repository, ObjectMapper objectMapper) {
@@ -283,7 +273,6 @@ class AdminUndoSnapshotMysqlTest {
         }
     }
 
-    /** 사용자가 대여 중이던 사물함을 일괄 반납(endActiveLents)한 배치를 만든다. 대상 사용자 ID 와 배치 ID 를 돌려준다. */
     private static Object[] bulkReturnedUser(
             LentConcurrencyMysqlTest.Fixture f, AdminCabinetUseCase bulk) {
         Long userId = f.newUser(f.lentItem);
@@ -305,7 +294,6 @@ class AdminUndoSnapshotMysqlTest {
         return new Object[] {userId, result.batchId()};
     }
 
-    /** Undo 결과를 "OK" 또는 충돌 코드 이름으로 바꾼다. */
     private static String undoOutcome(AdminUndoUseCase undo, String batchId) {
         try {
             undo.undoBulkStatusUpdate(batchId, new UndoRequest("되돌림"), ADMIN);
@@ -344,7 +332,6 @@ class AdminUndoSnapshotMysqlTest {
                                     });
                     assertThat(gate.reached.await(30, TimeUnit.SECONDS)).isTrue();
 
-                    // Undo 가 멈춘 사이 같은 사용자가 실제 서비스로 다른 사물함을 빌려 커밋한다.
                     f.service.startLent(userId, target);
 
                     gate.release.countDown();
@@ -373,7 +360,6 @@ class AdminUndoSnapshotMysqlTest {
                     CountDownLatch undoStarted = new CountDownLatch(1);
                     CompletableFuture<String> undoResult = new CompletableFuture<>();
 
-                    // 동시 startLent 를 흉내 낸다: 사용자 행 락을 쥐고, 새 대여를 만들고, 사물함을 FULL 로 바꾼 뒤 커밋한다.
                     f.tx.execute(
                             status -> {
                                 User locked = f.users.findByIdWithLock(userId).orElseThrow();
@@ -385,7 +371,6 @@ class AdminUndoSnapshotMysqlTest {
                                         });
                                 try {
                                     undoStarted.await();
-                                    // Undo 가 감사 로그를 읽어 스냅샷을 잡고 사용자 락에서 대기할 시간을 준다.
                                     Thread.sleep(2_000);
                                 } catch (InterruptedException e) {
                                     Thread.currentThread().interrupt();

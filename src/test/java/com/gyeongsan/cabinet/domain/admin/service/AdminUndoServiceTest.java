@@ -60,7 +60,6 @@ class AdminUndoServiceTest {
     private static final String ORIGINAL = "orig-batch";
     private static final UndoRequest REASON = new UndoRequest("실수로 일괄 반납함");
 
-    /** 원래 작업의 종료 시각. DB 에는 마이크로초까지만 저장되므로 로그의 나노초 값과 마이크로초 값이 같은 시각이다. */
     private static final String LOGGED_ENDED_AT = "2026-10-05T10:00:00.123456789";
 
     private static final LocalDateTime DB_ENDED_AT =
@@ -79,7 +78,6 @@ class AdminUndoServiceTest {
 
     @BeforeEach
     void setUp() {
-        // 트랜잭션은 이 단위 테스트의 관심사가 아니라서 가짜 트랜잭션 관리자로 감싼다(락/스냅샷 동작은 실제 DB 테스트가 검증한다).
         service =
                 new AdminUndoService(
                         adminActionLogPort,
@@ -88,7 +86,6 @@ class AdminUndoServiceTest {
                         userRepository,
                         reservationPort,
                         new TransactionTemplate(mock(PlatformTransactionManager.class)));
-        // 원래 작업 직후 상태: 사물함은 AVAILABLE, 대여는 종료됨.
         cabinet = cabinet(1L, 101, CabinetStatus.AVAILABLE);
         user = user(7L, "intra01");
         lent = lent(10L, cabinet, user, DB_ENDED_AT, LocalDateTime.now().plusDays(10));
@@ -227,7 +224,6 @@ class AdminUndoServiceTest {
         assertThat(saved.reason()).isEqualTo("실수로 일괄 반납함");
         assertThat(saved.request()).containsEntry("undoOfBatchId", ORIGINAL);
         assertThat(saved.createdAt().getNano() % 1000).isZero();
-        // 항목은 원본의 변경 전/후를 맞바꾼 것이다.
         AdminActionLogItem savedCabinet =
                 saved.items().stream()
                         .filter(i -> i.targetType() == AdminActionTargetType.CABINET)
@@ -247,7 +243,6 @@ class AdminUndoServiceTest {
     @Test
     @DisplayName("로그의 나노초 시각과 DB 의 마이크로초 시각은 같은 시각으로 비교한다(충돌로 오판하지 않는다)")
     void success_nanosecondLogValueMatchesMicrosecondDbValue() {
-        // setUp 의 로그는 ...123456789, DB 는 ...123456 이다.
         assertThat(service.undoBulkStatusUpdate(ORIGINAL, REASON, ADMIN)).isNotNull();
     }
 

@@ -14,9 +14,6 @@ public interface CabinetRepositoryPort {
 
     Optional<Cabinet> findByVisibleNum(Integer visibleNum);
 
-    /**
-     * 번호로 사물함 ID 만 읽는다(엔티티를 영속성 컨텍스트에 올리지 않는다). 락 전에 엔티티를 읽으면 OSIV 가 켜진 웹 요청에서 낡은 상태가 락 뒤에도 남는다.
-     */
     Optional<Long> findIdByVisibleNum(Integer visibleNum);
 
     Optional<Cabinet> findByVisibleNumWithLock(Integer visibleNum);

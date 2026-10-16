@@ -29,10 +29,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * 실제 운영/테스트 DB 와 같은 종류(MySQL 8.0/8.4)에서, 운영과 같은 방식(MariaDB 드라이버 + MariaDBDialect + Spring Boot 기본
- * 네이밍 전략)으로 마이그레이션 SQL 과 엔티티 매핑이 어긋나지 않는지 검증한다. Docker 가 없으면 건너뛴다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class AdminActionLogMigrationTest {
 
@@ -66,7 +62,6 @@ class AdminActionLogMigrationTest {
                         .applySetting(
                                 "hibernate.physical_naming_strategy",
                                 "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy")
-                        // 운영과 같은 validate: 엔티티가 기대하는 테이블/컬럼/타입이 실제 DB 에 없으면 실패한다.
                         .applySetting("hibernate.hbm2ddl.auto", "validate")
                         .build();
         return new MetadataSources(registry)
@@ -91,13 +86,10 @@ class AdminActionLogMigrationTest {
     void baselineThenMigrate_entitiesValidateAndPersist(String image) throws Exception {
         try (MySQLContainer<?> mysql = newMysql(image)) {
             mysql.start();
-            // 기존 운영 DB 처럼 비어 있지 않은 스키마를 흉내 낸다.
             BaselinedSchema.createExistingTables(mysql);
 
-            // 규칙 4: baseline 없이 비어 있지 않은 스키마에 migrate 하면 조용히 실행되지 않고 실패해야 한다.
             assertThatThrownBy(() -> flyway(mysql).migrate()).isInstanceOf(FlywayException.class);
 
-            // 사람이 1회 수동으로 찍는 baseline 과 같은 효과.
             flyway(mysql).baseline();
             MigrateResult result = flyway(mysql).migrate();
             assertThat(result.migrationsExecuted).isEqualTo(5);
@@ -138,7 +130,6 @@ class AdminActionLogMigrationTest {
     void v4AddsFtGradeToExistingUserTable(String image) throws Exception {
         try (MySQLContainer<?> mysql = newMysql(image)) {
             mysql.start();
-            // ft_grade 가 없는 기존 운영 user 테이블과 이미 들어 있는 사용자 한 명.
             executeSql(
                     mysql,
                     "CREATE TABLE `user` ("
@@ -261,7 +252,6 @@ class AdminActionLogMigrationTest {
                                                 AdminActionType.CABINET_BULK_STATUS_UNDO,
                                                 "orig-1"))
                         .isInstanceOf(Exception.class);
-                // 다른 원본에 대한 Undo 는 가능하다.
                 persistLog(
                         sessionFactory,
                         "undo-2",

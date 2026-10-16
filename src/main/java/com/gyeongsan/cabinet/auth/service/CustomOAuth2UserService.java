@@ -62,7 +62,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         return handleFtLogin(userRequest, attributes);
     }
 
-    /** 42 인트라 로그인: 캠퍼스/차단 검사 후 사용자 정보(블랙홀, 피시너, grade)를 갱신한다. */
     OAuth2User handleFtLogin(OAuth2UserRequest userRequest, Map<String, Object> attributes) {
         String intraId = (String) attributes.get("login");
         String email = (String) attributes.get("email");
@@ -174,7 +173,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         return null;
     }
 
-    /** 본과정(cursus 21)의 grade 를 해석한다. 해석에 실패하면 저장된 값을 건드리지 않도록 parsed=false 로 돌려준다. */
     private FtGradeSnapshot resolveGrade(Map<String, Object> attributes) {
         FtGradeSnapshot snapshot =
                 FtGradeResolver.resolve(

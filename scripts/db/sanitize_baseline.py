@@ -24,7 +24,7 @@ FORBIDDEN = [
     (re.compile(r"\bDEFINER\s*=", re.I), "DEFINER"),
     (re.compile(r"^\s*INSERT\s+INTO\b", re.I | re.M), "INSERT(데이터)"),
 ]
-SKIP_TABLES = {"flyway_schema_history"}  # Flyway 자신의 이력 테이블은 베이스라인에 포함하지 않는다.
+SKIP_TABLES = {"flyway_schema_history"}
 
 HEADER = """\
 -- V1: 운영 DB(cabi) 스키마 베이스라인.
@@ -45,11 +45,10 @@ def main(path: str) -> None:
         if pattern.search(raw):
             sys.exit(f"중단: 덤프에 {label} 가 있다. 베이스라인에 넣을 내용이 아니니 확인할 것.")
 
-    # 주석 제거: /*...*/ (세션 설정 포함), -- 줄 주석
     text = re.sub(r"/\*.*?\*/", "", raw, flags=re.S)
     text = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("--"))
 
-    tables = {}  # name -> statement (dump order 유지)
+    tables = {}
     for m in re.finditer(r"CREATE\s+TABLE\s+`([^`]+)`\s*\(.*?\)\s*ENGINE=[^;]*;", text, flags=re.S | re.I):
         name = m.group(1)
         if name in SKIP_TABLES:
@@ -62,16 +61,14 @@ def main(path: str) -> None:
     if not tables:
         sys.exit("중단: CREATE TABLE 을 하나도 찾지 못했다.")
 
-    # CREATE TABLE 바깥에 남은 SQL 문이 있으면(DROP/LOCK/ALTER 등) 알 수 없는 내용이므로 확인
     leftover = text
     for m in re.finditer(r"CREATE\s+TABLE\s+`[^`]+`\s*\(.*?\)\s*ENGINE=[^;]*;", text, flags=re.S | re.I):
         leftover = leftover.replace(m.group(0), "")
     leftover = re.sub(r"DROP\s+TABLE\s+IF\s+EXISTS\s+`[^`]+`\s*;", "", leftover, flags=re.I)
-    leftover = re.sub(r"^\s*;\s*$", "", leftover, flags=re.M).strip()  # 주석을 지우고 남은 ; 만 제거
+    leftover = re.sub(r"^\s*;\s*$", "", leftover, flags=re.M).strip()
     if leftover:
         sys.exit("중단: 예상 밖의 SQL 이 남아 있다:\n" + leftover[:500])
 
-    # FK 부모 우선 위상 정렬 (덤프 순서를 최대한 유지)
     deps = {
         n: {r for r in re.findall(r"REFERENCES\s+`([^`]+)`", s) if r != n} for n, s in tables.items()
     }

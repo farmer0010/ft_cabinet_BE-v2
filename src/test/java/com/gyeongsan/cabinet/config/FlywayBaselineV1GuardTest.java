@@ -11,17 +11,10 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * V1(운영 스키마 베이스라인)에 위험한 구문이 섞이지 않았는지 지킨다. Docker 없이 파일만 읽는다.
- *
- * <p>V1 은 새 DB 를 만들 때만 실행되지만, 설정 실수로 운영에서 실행되는 경우를 가정하면 DROP/DELETE 같은 구문이 한 줄이라도 있는 순간 운영 데이터가
- * 사라진다. 그래서 CREATE TABLE 외에는 허용하지 않는다.
- */
 class FlywayBaselineV1GuardTest {
 
     private static final Path V1 = Path.of("src/main/resources/db/migration/V1__baseline.sql");
 
-    /** 이 12개가 운영 덤프에 있던 테이블이다(V2~V5 가 만드는 admin_*, faq* 는 제외). */
     private static final List<String> EXPECTED_TABLES =
             List.of(
                     "attendance",
@@ -88,7 +81,6 @@ class FlywayBaselineV1GuardTest {
         }
         assertThat(order).containsExactlyInAnyOrderElementsOf(EXPECTED_TABLES);
 
-        // FK 가 참조하는 테이블은 참조하는 테이블보다 앞서 만들어져야 한다(FOREIGN_KEY_CHECKS 에 기대지 않는다).
         for (String statement : sql.split(";")) {
             Matcher self = Pattern.compile("CREATE TABLE `([^`]+)`").matcher(statement);
             if (!self.find()) {

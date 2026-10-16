@@ -120,7 +120,6 @@ class AdminActionLogPersistenceAdapterTest {
                         "{\"status\":\"FULL\",\"statusNote\":null}");
         org.springframework.test.util.ReflectionTestUtils.setField(first, "id", 1L);
         org.springframework.test.util.ReflectionTestUtils.setField(second, "id", 2L);
-        // 일부러 뒤섞어 넣어도 ID 순으로 복원되어야 한다.
         entity.addItem(second);
         entity.addItem(first);
         org.mockito.BDDMockito.given(repository.findByBatchId("batch-1"))

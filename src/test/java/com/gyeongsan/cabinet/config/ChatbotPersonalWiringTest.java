@@ -22,7 +22,6 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.FileSystemResource;
 
-/** 개인화 기능의 켜짐 조건과 빈 구성을 운영 application.yml 기본값으로 확인한다. */
 class ChatbotPersonalWiringTest {
 
     private static final Path MAIN_YML = Path.of("src/main/resources/application.yml");

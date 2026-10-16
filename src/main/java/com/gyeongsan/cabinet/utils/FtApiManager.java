@@ -87,10 +87,6 @@ public class FtApiManager {
         return callApiWithRetry(url, intraId, startDate, endDate);
     }
 
-    /**
-     * 사용자의 cursus_users 를 조회한다. 로그인 시점에만 갱신되는 grade 를 지급일에 다시 확인하는 데 쓴다. 실패하면 비어 있는 Optional 을
-     * 돌려주며, 호출하는 쪽은 저장된 값을 그대로 유지해야 한다.
-     */
     @RateLimiter(name = "ftApi")
     public Optional<List<FtCursusEntry>> getCursusEntries(String intraId) {
         try {
@@ -116,7 +112,6 @@ public class FtApiManager {
     }
 
     private Optional<List<FtCursusEntry>> requestCursusEntries(String intraId) {
-        // 로그인명은 URI 변수로 넘겨 경로 구분자 등이 인코딩되게 한다(문자열 이어붙이기 금지).
         JsonNode user =
                 webClient
                         .get()

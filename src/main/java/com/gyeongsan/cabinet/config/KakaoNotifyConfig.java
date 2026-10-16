@@ -17,11 +17,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * 카카오톡 알림(동의 등록, 알림 스위치). KAKAO_NOTIFY_ENABLED=true 일 때만 켜진다(기본 꺼짐). 켠 상태에서 암호화
- * 키(KAKAO_TOKEN_ENC_KEY)가 없거나 형식이 틀리면 부팅이 실패한다(토큰을 평문이나 엉뚱한 키로 저장하지 않기 위해). 키 값은 어떤 메시지·로그에도 남기지
- * 않는다.
- */
 @Configuration
 @ConditionalOnProperty(name = "app.kakao-notify.enabled", havingValue = "true")
 public class KakaoNotifyConfig {

@@ -94,7 +94,7 @@ public class CookieOAuth2AuthorizationRequestRepository
         try {
             return mapper.readValue(Base64.getUrlDecoder().decode(cookie.getValue()), cls);
         } catch (Exception e) {
-            return null; // Ignore invalid cookie
+            return null;
         }
     }
 }

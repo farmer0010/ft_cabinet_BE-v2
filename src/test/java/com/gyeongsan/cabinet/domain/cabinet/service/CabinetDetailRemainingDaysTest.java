@@ -24,7 +24,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/** 사물함 상세의 daysRemaining 이 목록과 같은 달력 기준인지, 대여 중이 아닐 때는 null 인지 확인한다. */
 class CabinetDetailRemainingDaysTest {
 
     private static final long CABINET_ID = 101L;

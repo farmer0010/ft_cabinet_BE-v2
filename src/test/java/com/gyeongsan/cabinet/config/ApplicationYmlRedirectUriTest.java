@@ -31,7 +31,6 @@ class ApplicationYmlRedirectUriTest {
             throws IOException {
         StandardEnvironment env = new StandardEnvironment();
         MutablePropertySources sources = env.getPropertySources();
-        // 실행 환경의 시스템 속성·환경변수가 결과에 섞이지 않도록 제거한다.
         sources.remove(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME);
         sources.remove(StandardEnvironment.SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME);
 

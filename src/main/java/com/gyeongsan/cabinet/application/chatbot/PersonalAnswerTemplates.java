@@ -10,12 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * 개인화 답변의 고정 문장. 문장은 여기에 쓰여 있고 값만 채운다(생성형 모델을 쓰지 않는다).
- *
- * <p>정책 표현 원칙: 반납 패널티는 만료 <b>시각</b>이 지나면 붙고, 스케줄러의 연체 전환은 만료일 끝까지 유예한다. 이 불일치가 정리되기 전까지는 "만료일까지는
- * 안전" 같은 약속을 하지 않고 사실(만료 시각, 지나면 패널티 대상)만 말한다.
- */
 final class PersonalAnswerTemplates {
 
     private static final DateTimeFormatter DATE_TIME =
@@ -118,7 +112,6 @@ final class PersonalAnswerTemplates {
         return d.format(DATE);
     }
 
-    /** 90분 -> "1시간 30분(90분)", 45분 -> "45분". */
     static String minutes(int total) {
         int m = Math.max(total, 0);
         if (m < 60) {

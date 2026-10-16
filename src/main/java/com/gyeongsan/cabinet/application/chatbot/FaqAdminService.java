@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Set;
 import lombok.extern.log4j.Log4j2;
 
-/** FAQ 관리(관리자)와 사용자 조회. 저장하면 이 서버의 검색 색인을 바로 다시 만들도록 요청한다(다른 서버는 주기 확인으로 따라온다). */
 @Log4j2
 public class FaqAdminService implements FaqAdminUseCase, FaqQueryUseCase {
 
@@ -100,7 +99,6 @@ public class FaqAdminService implements FaqAdminUseCase, FaqQueryUseCase {
             List<String> questions,
             java.time.LocalDateTime createdAt) {
         String cleanCategory = TextNormalizer.normalize(category);
-        // 답변은 줄바꿈을 살려야 해서 공백 정리 없이 NFC 와 앞뒤 공백만 정리한다.
         String cleanAnswer =
                 answer == null
                         ? ""

@@ -84,7 +84,6 @@ class AdminCabinetServiceBulkUpdateTest {
             LentType lentType,
             String note,
             boolean endActiveLents) {
-        // 대여를 종료하는 요청은 작업 사유가 필수이므로, 별도 지정이 없으면 기본 사유를 채운다.
         String reason = endActiveLents ? "테스트 사유" : null;
         return new BulkStatusUpdateRequest(ids, status, lentType, note, endActiveLents, reason);
     }
@@ -214,7 +213,6 @@ class AdminCabinetServiceBulkUpdateTest {
                 request(List.of(1L, 2L), CabinetStatus.AVAILABLE, null, null, true), ADMIN);
 
         assertThat(firstLent.getEndedAt()).isNotNull().isEqualTo(secondLent.getEndedAt());
-        // DB(DATETIME(6))가 마이크로초 아래를 잘라내므로, 처음부터 마이크로초로 잘려 있어야 로그와 DB 값이 일치한다.
         assertThat(firstLent.getEndedAt().getNano() % 1000).isZero();
     }
 
@@ -492,7 +490,6 @@ class AdminCabinetServiceBulkUpdateTest {
                 .containsEntry("userId", 7L);
         assertThat(lentItems.get(0).after().get("endedAt")).isNotNull();
         assertThat(lentItems.get(0).after()).containsEntry("userId", 7L);
-        // 사용자 이름은 로그 항목에 담지 않는다.
         assertThat(lentItems.get(0).before().toString()).doesNotContain("intra01");
     }
 

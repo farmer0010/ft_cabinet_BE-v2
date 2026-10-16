@@ -19,17 +19,6 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * 실제 모델에서 Java 임베딩 구현(ONNX Runtime + DJL 토크나이저 + 평균 풀링)이 올바른지 확인한다.
- *
- * <p>평가에서 의미 모델이 글자 겹침 기준선보다 나쁘게 나오면 "모델이 약한 것"인지 "구현이 틀린 것"인지 구분할 수 없다. 그래서 같은 모델 저장소의 원본 가중치를
- * sentence-transformers 로 돌린 정답 벡터(scripts/chatbot/golden_vectors.py 가 만든 golden.json)와 Java 어댑터의
- * 결과를 같은 문장에 대해 코사인 유사도로 비교한다. 1.0 에 가까우면 구현은 맞고 품질은 모델의 한계다.
- *
- * <p>환경변수 CHATBOT_EVAL_MODELS_DIR 아래 모델 디렉터리마다 golden.json 이 있어야 실행된다(없으면 건너뜀). 기준은
- * CHATBOT_GOLDEN_MIN_COSINE(기본 0.99, 양자화 모델은 fp32 와 조금 다르다). CHATBOT_EVAL_ENFORCE=false 면 기준 미달이어도
- * 실패시키지 않고 리포트(build/chatbot-eval/golden.md)에만 남긴다.
- */
 class ChatbotGoldenVectorTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -145,12 +134,11 @@ class ChatbotGoldenVectorTest {
                             float[] w = new float[v.length];
                             for (int i = 0; i < v.length; i++) {
                                 v[i] = (float) e.getValue().get(i).asDouble();
-                                w[(i + 1) % v.length] = v[i]; // 차원이 한 칸 밀린 벡터(틀린 구현을 흉내)
+                                w[(i + 1) % v.length] = v[i];
                             }
                             good.add(v);
                             bad.add(w);
                         });
-        // 빈 문자열처럼 벡터가 0 에 가까운 항목은 비교에서 제외한다(코사인이 정의되지 않는다).
         List<String> usable = new ArrayList<>();
         List<float[]> goodUsable = new ArrayList<>();
         List<float[]> badUsable = new ArrayList<>();

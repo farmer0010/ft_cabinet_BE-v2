@@ -9,11 +9,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.orm.jpa.support.OpenEntityManagerInViewInterceptor;
 
-/**
- * 감사 H-11 의 전제: 운영 설정에서 Open-Session-In-View(OSIV)가 실제로 켜져 있다. {@code spring.jpa.open-in-view} 를
- * 어디에서도 지정하지 않아 Boot 기본값(true)이 적용된다. 이 테스트는 그 사실을 고정한다 — 의도적으로 끈다면 이 테스트와 {@code
- * LentSwapOsivMysqlTest} 를 함께 고쳐야 한다.
- */
 @SpringBootTest
 class OsivEnabledTest {
 

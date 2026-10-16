@@ -27,7 +27,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
-/** 실제 HTTP 로 로컬 가짜 Gemini 서버를 호출해 요청 모양, 응답 해석, 시간 초과, 서킷 브레이커, 키 비노출을 확인한다. */
 class GeminiNoticeSummarizerAdapterTest {
 
     private static final String API_KEY = "TEST-KEY-should-never-leak-9f8e7d";
@@ -87,7 +86,6 @@ class GeminiNoticeSummarizerAdapterTest {
                         exchange.sendResponseHeaders(status, out.length);
                         exchange.getResponseBody().write(out);
                     } catch (IOException ignored) {
-                        // 클라이언트가 시간 초과로 먼저 끊은 경우
                     } finally {
                         exchange.close();
                     }
@@ -373,7 +371,6 @@ class GeminiNoticeSummarizerAdapterTest {
         try {
             adapter().summarize(secretBody, 150);
         } catch (NoticeSummaryException ignored) {
-            // 예상된 실패
         }
 
         assertThat(logs()).isNotBlank().doesNotContain(API_KEY, "원문비밀", "홍길동");

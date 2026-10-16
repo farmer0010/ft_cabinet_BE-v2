@@ -18,7 +18,6 @@ import org.springframework.web.reactive.function.client.ExchangeFunction;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import reactor.core.publisher.Mono;
 
-/** 실제 네트워크 없이 WebClient 요청을 가로채 기록하고, 고정된 JSON 응답을 돌려준다. */
 public final class CapturingExchangeFunction implements ExchangeFunction {
 
     private final List<ClientRequest> requests = new ArrayList<>();
@@ -42,7 +41,6 @@ public final class CapturingExchangeFunction implements ExchangeFunction {
         return requests;
     }
 
-    /** 요청 바디가 실제로 직렬화되어 전송될 때의 문자열(URL 인코딩 결과 포함)을 돌려준다. */
     public static String bodyOf(ClientRequest request) {
         MockClientHttpRequest mock = new MockClientHttpRequest(request.method(), request.url());
         request.body()

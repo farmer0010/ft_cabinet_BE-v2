@@ -32,18 +32,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 
-/**
- * 카카오 알림 발송용 외부 호출(인가 코드 교환, 토큰 갱신, "나에게 보내기"). 로그인용 {@link KakaoOAuthApiClientAdapter} 는 건드리지 않고
- * 따로 둔다.
- *
- * <p>토큰·인가 코드는 예외 메시지나 로그에 남기지 않는다. 오류 응답에서는 {@code error}/{@code code} 값만 읽는다.
- */
 @Component
 @ConditionalOnProperty(name = "app.kakao-notify.enabled", havingValue = "true")
 @Log4j2
 public class KakaoNotificationAdapter implements KakaoNotificationPort {
 
-    /** 카카오 오류 코드 -402: 필요한 동의 항목이 없다. */
     static final int CODE_INSUFFICIENT_SCOPE = -402;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -80,7 +73,6 @@ public class KakaoNotificationAdapter implements KakaoNotificationPort {
                 .build();
     }
 
-    /** 응답 상태와 본문(JSON 객체)을 함께 읽는다. 오류 상태여도 예외 없이 본문을 돌려준다. */
     private record Reply(HttpStatusCode status, Map<String, Object> body) {
         boolean ok() {
             return status.is2xxSuccessful();

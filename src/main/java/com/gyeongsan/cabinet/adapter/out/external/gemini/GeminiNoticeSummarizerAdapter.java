@@ -18,23 +18,12 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 
-/**
- * Gemini API({@code generateContent})로 공지를 요약한다.
- *
- * <ul>
- *   <li>API 키는 요청 헤더({@code x-goog-api-key})로만 보낸다. URL·로그·예외 메시지·{@code toString} 에 남기지 않는다.
- *   <li>연결/응답 시간 제한을 둔다. 인프라 오류(시간 초과, 5xx, 연결 실패)는 서킷 브레이커에 실패로 기록해 반복 장애 때 호출 자체를 건너뛴다. 빈 응답이나 안전
- *       차단은 "요약 없음"일 뿐 장애가 아니므로 실패로 세지 않는다.
- *   <li>오류 응답 본문과 공지 본문은 로그·예외에 담지 않는다.
- * </ul>
- */
 @Log4j2
 public class GeminiNoticeSummarizerAdapter implements NoticeSummarizerPort {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Pattern MODEL_NAME = Pattern.compile("[A-Za-z0-9._-]{1,64}");
 
-    /** 생각(thinking) 토큰도 출력 한도에 포함되므로 요약문 길이에 비해 넉넉히 둔다. */
     private static final int MAX_OUTPUT_TOKENS = 1024;
 
     private final WebClient webClient;
@@ -55,7 +44,6 @@ public class GeminiNoticeSummarizerAdapter implements NoticeSummarizerPort {
             throw new IllegalArgumentException("Gemini API 키가 비어 있습니다.");
         }
         if (model == null || !MODEL_NAME.matcher(model).matches()) {
-            // 모델 이름은 URL 경로에 들어가므로 형식을 제한한다.
             throw new IllegalArgumentException("Gemini 모델 이름 형식이 올바르지 않습니다.");
         }
         this.webClient = webClient;
@@ -66,7 +54,6 @@ public class GeminiNoticeSummarizerAdapter implements NoticeSummarizerPort {
         this.circuitBreaker = circuitBreaker;
     }
 
-    /** 연결/응답 시간 제한이 있는 WebClient. 기준 주소는 호출하는 쪽(설정)이 정한다. */
     public static WebClient createWebClient(String baseUrl, Duration timeout) {
         HttpClient httpClient =
                 HttpClient.create()
@@ -87,7 +74,6 @@ public class GeminiNoticeSummarizerAdapter implements NoticeSummarizerPort {
         }
     }
 
-    /** 키를 노출하는 값이 실수로 출력되지 않게 한다. */
     @Override
     public String toString() {
         return "GeminiNoticeSummarizerAdapter[model=" + model + "]";
@@ -133,7 +119,6 @@ public class GeminiNoticeSummarizerAdapter implements NoticeSummarizerPort {
                             .exchangeToMono(
                                     r -> {
                                         if (!r.statusCode().is2xxSuccessful()) {
-                                            // 오류 본문은 읽지도 남기지도 않는다.
                                             return r.releaseBody()
                                                     .then(
                                                             reactor.core.publisher.Mono.error(
@@ -153,7 +138,6 @@ public class GeminiNoticeSummarizerAdapter implements NoticeSummarizerPort {
         return parse(response);
     }
 
-    /** 요약이 없으면(차단, 후보 없음, 출력 한도 도달, 빈 문자열) 빈 값. 해석할 수 없는 JSON 은 장애로 본다. */
     private Optional<String> parse(String response) {
         if (response == null || response.isBlank()) {
             return Optional.empty();
@@ -171,7 +155,6 @@ public class GeminiNoticeSummarizerAdapter implements NoticeSummarizerPort {
         JsonNode candidate = root.path("candidates").path(0);
         String finish = candidate.path("finishReason").asText("");
         if (!finish.isEmpty() && !"STOP".equals(finish)) {
-            // MAX_TOKENS 등: 중간에 끊긴 요약은 믿지 않는다.
             log.warn("[NoticeSummary] 정상 종료가 아니라 요약을 쓰지 않습니다 - finishReason: {}", finish);
             return Optional.empty();
         }

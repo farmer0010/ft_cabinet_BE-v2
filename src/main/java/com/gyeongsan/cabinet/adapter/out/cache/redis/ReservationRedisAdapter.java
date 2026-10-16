@@ -13,12 +13,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
-/**
- * 예약은 두 키로 저장된다: cabinet:reservation:{번호} → 예약자, user:reservation:{userId} → 번호.
- *
- * <p>두 키가 어긋나면(한쪽만 남으면) 사용자에게는 보이지 않는 "유령 선점"이 생기므로, 두 키를 함께 바꾸는 동작은 모두 Lua 스크립트로 한 번에 실행한다. 스크립트는
- * 사물함 키를 이름으로 조립해 접근하므로 Redis 클러스터 모드에서는 쓸 수 없다(테스트/운영 모두 비클러스터).
- */
 @Component
 @RequiredArgsConstructor
 public class ReservationRedisAdapter implements ReservationPort {
@@ -32,10 +26,6 @@ public class ReservationRedisAdapter implements ReservationPort {
     private static final long STATUS_ALREADY_MINE = 1L;
     private static final long STATUS_TAKEN_BY_OTHER = 2L;
 
-    /**
-     * KEYS[1]=새 사물함 키, KEYS[2]=내 예약 키 / ARGV[1]=userId, ARGV[2]=새 번호, ARGV[3]=TTL(초), ARGV[4]=사물함 키
-     * 접두어. 반환: {상태, 취소된 기존 번호 또는 ''}.
-     */
     private static final DefaultRedisScript<List> RESERVE_REPLACING_SCRIPT =
             new DefaultRedisScript<>(
                     """
@@ -54,10 +44,6 @@ public class ReservationRedisAdapter implements ReservationPort {
                     """,
                     List.class);
 
-    /**
-     * KEYS[1]=내 예약 키 / ARGV[1]=userId, ARGV[2]=사물함 키 접두어, ARGV[3]=함께 정리할 사물함 번호 또는 ''. 내 예약이 가리키는
-     * 사물함 키와 ARGV[3] 의 사물함 키는 예약자가 나일 때만 지운다. 반환: 취소된 내 예약 번호 또는 ''.
-     */
     private static final DefaultRedisScript<String> CANCEL_SCRIPT =
             new DefaultRedisScript<>(
                     """
@@ -118,7 +104,6 @@ public class ReservationRedisAdapter implements ReservationPort {
         if (visibleNums == null || visibleNums.isEmpty()) {
             return Map.of();
         }
-        // MGET 은 키 순서대로 값을 돌려주므로 입력 순서를 고정한 목록으로 짝을 맞춘다.
         List<Integer> nums = List.copyOf(visibleNums);
         List<String> values =
                 redisTemplate.opsForValue().multiGet(nums.stream().map(this::cabinetKey).toList());
@@ -153,7 +138,6 @@ public class ReservationRedisAdapter implements ReservationPort {
     @Override
     public Optional<Long> getUserReservationTtlSeconds(Long userId) {
         Long ttl = redisTemplate.getExpire(USER_KEY_PREFIX + userId, TimeUnit.SECONDS);
-        // -2: 키 없음, -1: 만료 없음(예약 키에는 항상 TTL 이 있으므로 비정상). 둘 다 "남은 시간 없음".
         return ttl != null && ttl >= 0 ? Optional.of(ttl) : Optional.empty();
     }
 

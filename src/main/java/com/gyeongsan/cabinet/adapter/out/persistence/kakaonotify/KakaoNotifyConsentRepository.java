@@ -27,7 +27,6 @@ public interface KakaoNotifyConsentRepository extends JpaRepository<KakaoNotifyC
     @Query(RECIPIENT_SELECT + " AND u.id = :userId")
     Optional<KakaoRecipient> findActiveRecipient(@Param("userId") Long userId);
 
-    /** 읽은 토큰이 그대로일 때만 해지한다(조건부 갱신 한 문장이라 동시 재동의와 겹쳐도 안전하다). */
     @Modifying(clearAutomatically = true)
     @Query(
             "UPDATE KakaoNotifyConsent c SET c.revokedAt = :now "

@@ -29,31 +29,11 @@ import java.util.Map;
 import java.util.Optional;
 import lombok.extern.log4j.Log4j2;
 
-/**
- * 슬랙 공지 채널의 새 글을 카카오 알림 수신 대상(동의 유효 AND 알림 켜짐)에게 "나에게 보내기"로 전달한다. 구조는 오류제보 포워더({@code
- * SlackReportForwardService})와 같다.
- *
- * <ul>
- *   <li>중복 방지: 채널별 마지막 확인 ts 커서. 커서가 없으면 과거 글은 보내지 않고 가장 최근 글에서 시작한다. 커서를 못 읽으면 그 주기는 건너뛴다.
- *   <li>수신자가 없거나 조회에 실패하면 경고만 남기고 <b>커서를 옮기지 않아</b> 공지가 조용히 사라지지 않게 한다. 다만 {@code maxHoldHours} 보다
- *       오래된 공지는 새 수신자에게 쏟아내지 않도록 경고와 함께 건너뛴다.
- *   <li>개별 발송 실패는 로그만 남기고 다음 사람으로 넘어간다. 카카오가 동의 해지({@code invalid_grant}, 발송 시 -402)로 거절하면 그 동의를 해지
- *       처리해 이후 대상에서 뺀다.
- *   <li><b>커서 전진 규칙</b>(공지 한 건 기준): 한 명이라도 받았으면 전진한다(실패한 사람에게 다시 보내려다 받은 사람에게 중복 발송하지 않으려는 것이며, 못
- *       받은 사람은 로그만 남는다). 아무도 못 받았는데 실패 중 하나라도 <b>재시도로 풀릴 수 있는</b>(일시) 실패면 전진하지 않고 이후 공지도 보내지 않은 채
- *       다음 주기에 그 공지부터 다시 시도한다. 실패가 모두 <b>영구</b>(동의 철회·해지, refresh_token 만료 {@code invalid_grant},
- *       동의 항목 부족 -402)이면 재시도해도 소용없으니 전진한다. 재시도는 {@code maxHoldHours} 가 지나면 건너뛰므로 유한하다.
- *   <li>각 수신자는 발송 직전에 동의/알림 스위치를 다시 확인하고, 한 번의 실행에서는 refresh_token 갱신을 사람당 한 번만 한다.
- *   <li>본문이 카카오 글자 수 제한을 넘을 때만 요약기를 <b>공지 한 건당 한 번</b> 부르고 그 결과를 모든 수신자가 공유한다. 요약이 꺼져 있거나 실패/무효하면
- *       기존 자르기로 폴백하며 발송을 막지 않는다.
- * </ul>
- */
 @Log4j2
 public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
 
     private static final String PREFIX = "📢 [공지] ";
 
-    /** 요약문 목표 길이(접두어 제외). 프롬프트에 알려 주는 값이며, 실제 상한은 남은 글자 수다. */
     private static final int SUMMARY_TARGET_CHARS = 150;
 
     private final SlackChannelPort channelPort;
@@ -84,7 +64,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
         this.summarizer = summarizer;
     }
 
-    /** 요약 없이(기존 자르기만) 동작하는 구성. */
     public SlackNoticeForwardService(
             SlackChannelPort channelPort,
             NoticeCursorPort cursorPort,
@@ -104,12 +83,9 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
                 NoticeSummarizerPort.disabled());
     }
 
-    /** 이 수신자에게 보낼 수 없는 이유. 재시도로 풀릴 수 있는지에 따라 커서 전진 여부가 갈린다. */
     private enum Failure {
         NONE,
-        /** 동의 철회·해지, refresh_token 만료(invalid_grant), 동의 항목 부족(-402). 재시도해도 소용없다. */
         PERMANENT,
-        /** 카카오·네트워크·DB 장애, 복호화 실패(키 문제) 등 나중에 풀릴 수 있는 것. */
         TRANSIENT
     }
 
@@ -126,13 +102,11 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
     }
 
     private record SendOutcome(int sent, int transientFailures, int permanentFailures) {
-        /** 아무도 받지 못했고 재시도로 풀릴 수 있는 실패가 있다 - 커서를 옮기지 않고 다음 주기에 다시 시도한다. */
         boolean mustRetry() {
             return sent == 0 && transientFailures > 0;
         }
     }
 
-    /** 재시도 때 요약(외부 호출)과 퍼머링크 조회를 되풀이하지 않도록 만든 메시지를 잠시 기억한다. */
     private static final int PREPARED_CACHE_SIZE = 20;
 
     private final Map<String, KakaoMessage> prepared =
@@ -175,7 +149,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
         List<SlackChannelMessage> forwardable =
                 all.stream().filter(m -> !m.isSystemMessage()).toList();
 
-        // 오래 보류된 공지는 새 수신자에게 쏟아내지 않는다(조용히 버리지 않고 경고를 남긴다).
         List<SlackChannelMessage> fresh = forwardable.stream().filter(m -> !isTooOld(m)).toList();
         int expired = forwardable.size() - fresh.size();
         if (expired > 0) {
@@ -208,7 +181,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
             }
             sent += summary.sent();
             if (skipped > 0) {
-                // 요약을 받은 사람에게 다음 주기에 요약이 또 가지 않도록, 생략한 공지 바로 앞까지 커서를 옮겨 둔다.
                 saveCursor(channelId, fresh.get(skipped - 1).ts());
             }
         }
@@ -217,7 +189,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
             SendOutcome outcome =
                     sendToAll(recipients, sessions, preparedNoticeMessage(channelId, message));
             if (outcome.mustRetry()) {
-                // 이 공지부터 다시 시도하도록 커서를 그대로 두고, 순서가 뒤바뀌지 않게 이후 공지도 보내지 않는다.
                 logHeld("공지 ts=" + message.ts(), outcome, recipients.size());
                 log.info(
                         "[SlackNotice] 새 글 {}건 확인, {}건 전달 후 보류, 수신자 {}명, 발송 {}건 (생략 {}건)",
@@ -287,7 +258,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
         }
     }
 
-    /** 수신자를 못 구하면 빈 목록(이번 주기는 보류). 부팅이나 스케줄러를 막지 않고 경고만 남긴다. */
     private List<KakaoRecipient> loadRecipients() {
         try {
             List<KakaoRecipient> recipients = consentRepository.findActiveRecipients();
@@ -323,7 +293,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
                             "발송 시 동의 항목 부족(-402)");
                     session.fail(Failure.PERMANENT);
                 } catch (RuntimeException e) {
-                    // 한 사람의 실패가 다른 사람을 막지 않게 한다. 토큰/본문은 로그에 남기지 않는다.
                     log.error(
                             "[SlackNotice] 발송 실패 - userId: {}, 원인: {}",
                             recipient.userId(),
@@ -331,7 +300,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
                     session.fail(Failure.TRANSIENT);
                 }
             }
-            // 이번 실행 앞 단계에서 이미 못 보내게 된 사람도 같은 종류의 실패로 센다.
             if (session.failure == Failure.PERMANENT) {
                 permanentFailures++;
             } else {
@@ -341,12 +309,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
         return new SendOutcome(sent, transientFailures, permanentFailures);
     }
 
-    /**
-     * 발송 직전 재확인 → 복호화 → access_token 갱신. 이 사람에게 보낼 수 없으면 false.
-     *
-     * <p>복호화 실패(키 분실·변경)는 동의를 해지하지 않는다. 키를 잘못 넣은 일시적 실수가 모든 동의를 영구히 지우지 않게 하기 위해서이며, 유저가 다시 동의하면 새
-     * 키로 덮어써진다.
-     */
     private boolean openSession(KakaoRecipient listed, Session session) {
         Optional<KakaoRecipient> current;
         try {
@@ -357,7 +319,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
             return false;
         }
         if (current.isEmpty()) {
-            // 목록을 읽은 뒤 동의가 해지됐거나 알림을 껐다. 재시도해도 받을 수 없다.
             session.fail(Failure.PERMANENT);
             return false;
         }
@@ -409,7 +370,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
                         userId);
             }
         } catch (RuntimeException e) {
-            // 저장에 실패해도 이번 발송은 계속한다. 이전 토큰이 아직 유효하면 다음 실행에서 다시 회전된다.
             log.error(
                     "[SlackNotice] 새 refresh_token 저장 실패 - userId: {}, 원인: {}",
                     userId,
@@ -439,7 +399,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
         return "kakao-notify:" + userId;
     }
 
-    /** 같은 공지를 재시도할 때 요약·퍼머링크 조회를 되풀이하지 않는다(Gemini 호출, Slack 호출 절약). */
     private KakaoMessage preparedNoticeMessage(String channelId, SlackChannelMessage message) {
         KakaoMessage cached = prepared.get(message.ts());
         if (cached != null) {
@@ -485,10 +444,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
         return text.codePointCount(0, text.length()) > KakaoMessage.MAX_TEXT_LENGTH;
     }
 
-    /**
-     * 요약한 최종 문구(접두어 + 요약 + 첨부 안내). 요약기가 없거나 실패하거나 결과가 무효(빈 값, 허용 길이 초과)면 빈 값을 돌려 호출한 쪽이 자르기로 폴백하게
-     * 한다. 어떤 실패도 발송을 막지 않으며, 원문은 로그에 남기지 않는다.
-     */
     private Optional<String> summarized(
             SlackChannelMessage message, String text, String attachment) {
         int allowed =
@@ -519,17 +474,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
 
     private static final int MAX_REASON_LENGTH = 200;
 
-    /**
-     * 요약 실패 원인을 로그용 문자열로 만든다. 원인 파악(예: "Gemini 응답 상태 429")에 필요한 메시지를 남기되, 안전하게 통제된 것만 쓴다.
-     *
-     * <ul>
-     *   <li>{@link NoticeSummaryException}: 요약기 어댑터가 만든 고정 문구(상태 코드, 예외 클래스명 등)라 메시지를 함께 남긴다. 어댑터는
-     *       응답 본문·키·요청 URL·헤더를 메시지에 담지 않는다.
-     *   <li>그 밖의 예외: 메시지에 무엇이 들어 있을지 보장할 수 없으므로(라이브러리가 URL 등을 담을 수 있음) 클래스명만 남긴다.
-     * </ul>
-     *
-     * 스택 트레이스와 cause 는 남기지 않는다(cause 메시지에 요청 URL 이 있을 수 있음). 줄바꿈은 공백으로 바꾸고 길이를 제한한다.
-     */
     static String failureReason(RuntimeException e) {
         String type = e.getClass().getSimpleName();
         if (!(e instanceof NoticeSummaryException) || e.getMessage() == null) {
@@ -545,10 +489,6 @@ public class SlackNoticeForwardService implements ForwardSlackNoticesUseCase {
         return type + ": " + detail;
     }
 
-    /**
-     * 카톡 메시지를 눌렀을 때 열릴 주소. 잘린 본문의 전체를 볼 수 있도록 해당 슬랙 글의 퍼머링크를 쓰고, 얻지 못하면(네트워크 오류, 권한 부족, 이상한 값) 기본
-     * 주소로 폴백한다. 어떤 경우에도 발송을 막지 않는다. 공지 한 건당 한 번만 조회한다(수신자 수와 무관).
-     */
     private String linkFor(String channelId, SlackChannelMessage message) {
         if (!settings.permalinkEnabled()) {
             return settings.linkUrl();

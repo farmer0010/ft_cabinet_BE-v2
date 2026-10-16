@@ -97,7 +97,6 @@ public class CabinetDomainService implements CabinetQueryUseCase {
                 .collect(Collectors.toList());
     }
 
-    /** 대여 가능한 사물함만 한 번에 조회한다. 예약은 보조 정보라 Redis 가 실패해도 목록은 내려가야 하므로 예약이 없는 것으로 본다. */
     private Map<Integer, Long> findReservedUserIds(List<Cabinet> cabinets) {
         Set<Integer> availableNums =
                 cabinets.stream()

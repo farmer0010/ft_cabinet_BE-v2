@@ -22,10 +22,6 @@ public class KakaoConsentPersistenceAdapter implements KakaoConsentRepositoryPor
     private final KakaoNotifyConsentRepository consentRepository;
     private final UserRepository userRepository;
 
-    /**
-     * 유저 행을 먼저 잠근다(다른 흐름과 같은 "유저 → ..." 순서). 같은 유저의 동의 요청 두 개가 동시에 와도 한 줄씩 처리되어 user_id UNIQUE 위반으로
-     * 500 이 나지 않고, "첫 동의인가"의 판단도 어긋나지 않는다.
-     */
     @Override
     @Transactional
     public boolean grant(

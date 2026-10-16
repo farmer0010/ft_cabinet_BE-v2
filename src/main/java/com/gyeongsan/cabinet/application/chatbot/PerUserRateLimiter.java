@@ -5,12 +5,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
-/**
- * 사용자별 요청 횟수 제한(슬라이딩 윈도). 서버 메모리에만 두므로 서버가 여러 대면 한도가 서버별로 적용된다(서버 수만큼 느슨해지는 것은 수용). 전역 한도( {@code
- * chatbotApi})와 별개로, 한 사용자가 개인 조회를 반복해 DB 를 두드리지 못하게 한다.
- *
- * <p>사용자 ID 와 요청 시각만 들고 있고, 윈도가 지난 기록은 주기적으로 지워서 메모리가 활성 사용자 수에 비례하게만 유지된다.
- */
 public final class PerUserRateLimiter {
 
     private static final int SWEEP_EVERY_CALLS = 1024;
@@ -34,7 +28,6 @@ public final class PerUserRateLimiter {
         this.nanoClock = nanoClock;
     }
 
-    /** 한도 안이면 이번 요청을 기록하고 true, 넘었으면 기록하지 않고 false. */
     public boolean tryAcquire(long userId) {
         long now = nanoClock.getAsLong();
         boolean[] allowed = new boolean[1];

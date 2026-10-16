@@ -64,21 +64,9 @@ import org.springframework.web.multipart.MultipartFile;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * 감사 H-11 재현: 이사(useSwap)는 새 사물함 엔티티를 <b>트랜잭션 밖에서</b> 먼저 읽는다({@code swapWithLocks} 의 {@code
- * findByVisibleNum}). 웹 요청에서는 Open-Session-In-View(OSIV, Boot 기본값 켜짐)가 요청 전체에 걸쳐 영속성 컨텍스트 하나를 열어
- * 두므로 그 엔티티가 그대로 남고, 이후 트랜잭션이 같은 컨텍스트를 이어 쓴다. 락을 잡은 뒤 {@code findByIdWithLock} 이 같은 행을 다시 읽어도
- * Hibernate 는 이미 관리 중인 인스턴스의 상태를 갱신하지 않는다면, 다른 사람이 그 사이 사물함을 FULL 로 바꿨는데도 이사가 'AVAILABLE' 로 보고 진행해
- * 한 사물함에 활성 대여가 2건 생긴다.
- *
- * <p>실제 MySQL 8.0/8.4(운영 MariaDB 와 같은 드라이버) + 실제 Redis + 실제 서비스 코드로 돌린다. OSIV 는 웹 계층이 없으므로 {@code
- * OpenEntityManagerInViewInterceptor} 가 하는 일(요청 스레드에 EntityManager 를 바인딩)을 그대로 흉내 낸다. "읽은 뒤 락 전"
- * 구간은 읽기 직후에 멈추는 테스트 전용 훅으로 결정적으로 만든다. Docker 가 없으면 건너뛴다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class LentSwapOsivMysqlTest {
 
-    /** 훅이 멈출 스레드에만 설정한다. */
     private static final ThreadLocal<Gate> GATE = new ThreadLocal<>();
 
     static final class Gate {
@@ -189,7 +177,6 @@ class LentSwapOsivMysqlTest {
         }
     }
 
-    /** 번호로 사물함을 읽은 직후, 이 스레드에 게이트가 있으면 풀어 줄 때까지 멈춘다(읽은 뒤 락 전 구간). */
     private static CabinetRepositoryPort withPauseAfterRead(CabinetRepositoryPort target) {
         return (CabinetRepositoryPort)
                 Proxy.newProxyInstance(
@@ -268,7 +255,6 @@ class LentSwapOsivMysqlTest {
         return mock(MultipartFile.class);
     }
 
-    /** 서비스 호출 결과를 "OK" 또는 ErrorCode 이름(그 외 예외는 클래스명)으로 바꾼다. */
     private static String outcome(Runnable call) {
         try {
             call.run();
@@ -288,10 +274,6 @@ class LentSwapOsivMysqlTest {
                 visibleNum);
     }
 
-    /**
-     * 요청 스레드에서 서비스를 실행한다. osiv 가 true 이면 {@code OpenEntityManagerInViewInterceptor} 와 같이 이 스레드에
-     * EntityManager 를 요청 범위로 바인딩한다. 읽은 직후 멈추는 게이트를 걸어, 게이트에 도달했다는 신호를 {@code gate.reached} 로 준다.
-     */
     private static CompletableFuture<String> requestThread(
             ExecutorService pool,
             EntityManagerFactory emf,
@@ -320,10 +302,6 @@ class LentSwapOsivMysqlTest {
                 pool);
     }
 
-    /**
-     * 이사하려는 사람(swapper)이 새 사물함을 읽고 멈춘 사이 다른 사람이 같은 사물함을 차지(커밋)한다. 멈춘 요청을 풀어 준 결과와 그 사물함의 활성 대여 수를
-     * 돌려준다.
-     */
     private static Object[] swapperPausedWhileSomeoneTakesCabinet(
             LentConcurrencyMysqlTest.Fixture f,
             EntityManagerFactory emf,
@@ -355,7 +333,6 @@ class LentSwapOsivMysqlTest {
                 throw new IllegalStateException("이사 요청이 사물함을 읽는 지점에 도달하지 못했다");
             }
 
-            // 멈춘 사이 다른 사람이 같은 사물함을 차지한다(별도 요청이므로 OSIV 컨텍스트가 비어 있다 = 깨끗한 읽기).
             String competitorResult =
                     outcome(
                             () -> {
@@ -449,7 +426,6 @@ class LentSwapOsivMysqlTest {
                                 .isZero());
     }
 
-    /** 같은 사물함으로 두 사람이 동시에 이사하는 경합을 20번 돌려, 활성 대여가 2건이 된 횟수를 돌려준다. */
     private static int naturalRaceDoubleBookings(
             LentConcurrencyMysqlTest.Fixture f, EntityManagerFactory emf, boolean osiv)
             throws Exception {
@@ -500,7 +476,6 @@ class LentSwapOsivMysqlTest {
         return doubleBooked;
     }
 
-    /** 배리어로 동시에 출발하는 요청 하나. osiv 면 요청 범위 EntityManager 를 바인딩한다. */
     private static String request(
             EntityManagerFactory emf, boolean osiv, CyclicBarrier barrier, Runnable call) {
         EntityManager em = null;

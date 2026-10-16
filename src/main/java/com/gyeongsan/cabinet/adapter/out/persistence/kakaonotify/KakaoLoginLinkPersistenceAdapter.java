@@ -8,7 +8,6 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 로그인용 OauthLink 를 읽기만 한다. OauthLink 와 그 저장소 코드는 건드리지 않으려고 이 어댑터가 직접 조회한다(쓰기 없음). */
 @Component
 public class KakaoLoginLinkPersistenceAdapter implements KakaoLoginLinkPort {
 

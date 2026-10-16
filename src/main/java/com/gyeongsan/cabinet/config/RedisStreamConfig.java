@@ -64,10 +64,6 @@ public class RedisStreamConfig {
         return container;
     }
 
-    /**
-     * 수령만 하고 ACK 하지 못한 메시지(처리 중 죽은 프로세스의 PEL)를 주기적으로 회수해 같은 리스너로 다시 처리한다. 소비자 이름이 부팅마다 바뀌어 구독은 그
-     * 메시지를 다시 읽지 못하기 때문이다.
-     */
     @Bean
     public StreamPendingReclaimer streamPendingReclaimer(
             StreamListener<String, MapRecord<String, String, String>> slackAlarmStreamListener,
@@ -94,9 +90,6 @@ public class RedisStreamConfig {
         return new InitMarkerSkippingListener(listener, stringRedisTemplate, CONSUMER_GROUP_NAME);
     }
 
-    /**
-     * 구독을 등록한다. 기본값(첫 오류에 구독 취소)을 끄고 오류 처리기를 둔다: Redis 연결 끊김이나 스트림 키 삭제로 한 번 실패해도 소비가 영구히 멈추지 않는다.
-     */
     private void subscribe(
             StreamMessageListenerContainer<String, MapRecord<String, String, String>> container,
             String streamKey,
@@ -116,11 +109,6 @@ public class RedisStreamConfig {
                 listener);
     }
 
-    /**
-     * 그룹이 사라졌을 때(스트림 키 삭제, Redis 재시작 등) 남아 있는 메시지를 놓치지 않도록 처음({@code 0})부터 읽는 그룹을 만든다(스트림이 없으면 같이
-     * 만든다). 처리가 끝난 메시지는 리스너가 삭제(XDEL)하므로 스트림에 남은 것은 아직 처리되지 않은 메시지뿐이다. 이미 그룹이 있으면(BUSYGROUP) 아무것도
-     * 하지 않는다.
-     */
     private void recreateGroupFromStart(String streamKey) {
         try {
             stringRedisTemplate.execute(

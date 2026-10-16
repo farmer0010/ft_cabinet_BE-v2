@@ -32,6 +32,5 @@ public interface UserRepositoryPort {
 
     List<User> findAllPenaltyUsers();
 
-    /** 주어진 권한 중 하나를 가진, 탈퇴하지 않은(deletedAt 이 없는) 유저. */
     List<User> findAllActiveByRoleIn(Collection<UserRole> roles);
 }

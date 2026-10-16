@@ -12,10 +12,6 @@ import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 
-/**
- * 운영 설정 파일(application.yml, application-prod.yml)을 그대로 읽어 {@link RedisConfig} 의 부팅 동작을 확인한다. 감사
- * H-6의 실제 사고 재현: 프로필 이름이 prod 가 아니면 비밀번호 설정이 빠져 인증 없이 연결을 시도하고도 앱이 정상 기동했다.
- */
 class RedisConfigStartupTest {
 
     private static final Path MAIN_YML = Path.of("src/main/resources/application.yml");
@@ -29,7 +25,6 @@ class RedisConfigStartupTest {
                 .withInitializer(
                         context -> {
                             try {
-                                // 프로필 설정이 기본 설정보다 우선하도록 먼저 넣는다.
                                 if (withProdYml) {
                                     for (PropertySource<?> source :
                                             new YamlPropertySourceLoader()
@@ -138,7 +133,6 @@ class RedisConfigStartupTest {
     @Test
     @DisplayName("운영 설정 파일의 기본값은 비인증 허용이 꺼져 있다")
     void insecureFlagDefaultsToOff() {
-        // 안전한 설정으로 기동시킨 뒤 기본값을 읽는다(안전하지 않은 설정이면 기동 자체가 실패하므로).
         runner(false)
                 .withPropertyValues(
                         "spring.data.redis.password=" + SECRET,

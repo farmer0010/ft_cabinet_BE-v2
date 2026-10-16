@@ -19,7 +19,6 @@ final class ChatbotTestSupport {
 
     private ChatbotTestSupport() {}
 
-    /** 문장마다 미리 정한 방향의 단위 벡터를 돌려준다. 정해두지 않은 문장은 "아무와도 비슷하지 않은" 벡터. */
     static class FakeEmbedding implements EmbeddingPort {
         final Map<String, float[]> vectors = new HashMap<>();
         final List<String> calls = new ArrayList<>();
@@ -50,7 +49,6 @@ final class ChatbotTestSupport {
             if (v != null) {
                 return v.clone();
             }
-            // 어떤 FAQ 와도 직교에 가까운 벡터
             float[] other = new float[dimension];
             other[dimension - 1] = 1f;
             return other;

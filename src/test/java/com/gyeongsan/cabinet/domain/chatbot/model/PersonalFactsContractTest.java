@@ -9,7 +9,6 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** 개인화 응답에 실릴 수 있는 필드 목록을 고정한다. 필드를 추가하려면 이 테스트를 고쳐야 하므로, 개인 정보가 응답에 새로 나가는 변경은 리뷰 없이 지나가지 못한다. */
 class PersonalFactsContractTest {
 
     private static List<String> fields(Class<?> type) {

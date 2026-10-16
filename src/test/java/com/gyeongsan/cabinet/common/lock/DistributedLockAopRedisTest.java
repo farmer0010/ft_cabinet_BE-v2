@@ -25,7 +25,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** 실제 Redis 로 분산락의 상호 배제, 소유자 확인 해제, 경합 시 응답을 확인한다. Docker 가 없으면 건너뛴다. */
 @Testcontainers(disabledWithoutDocker = true)
 class DistributedLockAopRedisTest {
 
@@ -56,7 +55,6 @@ class DistributedLockAopRedisTest {
         template.getConnectionFactory().getConnection().serverCommands().flushAll();
     }
 
-    /** 락 키는 모두 같은 고정 키. lease 2초, 대기 1초. 시각은 객체 생성 기준 ms 다. */
     public static class Target {
         final long t0 = System.currentTimeMillis();
         final AtomicInteger active = new AtomicInteger();
@@ -107,7 +105,6 @@ class DistributedLockAopRedisTest {
                         pool.submit(
                                 () -> {
                                     barrier.await();
-                                    // 락이 잠깐(100ms)만 잡히므로 대기 1초 안에 순서대로 모두 통과한다.
                                     proxy.run("same", 100);
                                     return null;
                                 }));
@@ -155,7 +152,6 @@ class DistributedLockAopRedisTest {
                                         .isEqualTo(ErrorCode.REQUEST_IN_PROGRESS);
                                 assertThat(e.getErrorCode().getStatus().value()).isEqualTo(409);
                             });
-            // 거부당한 요청이 먼저 잡은 요청의 락을 지우면 안 된다.
             assertThat(template.hasKey("test-lock")).isTrue();
 
             holder.get();
@@ -168,10 +164,6 @@ class DistributedLockAopRedisTest {
     @Test
     @DisplayName("lease 가 만료된 뒤 먼저 끝난 요청이 다음 요청의 락을 지우지 않는다 (소유자 확인 해제)")
     void expiredHolderDoesNotReleaseNextHoldersLock() throws Exception {
-        // lease 2초. A: 0~3.2초, B: 2.3~3.8초, C: A 가 끝난 직후(3.2초) 시도.
-        //  - A 의 락은 2.0초에 만료 -> B 가 2.3초에 락을 잡는다(A 와 B 가 겹치는 것은 lease 만료 자체의 결과다).
-        //  - A 가 3.2초에 끝나며 해제를 시도한다. 소유자를 확인하지 않으면 B 의 락을 지워 C 가 B 와 겹쳐 진입한다.
-        //  - 소유자를 확인하면 B 의 락이 유지되어, C 는 B 가 끝난 뒤에야 진입한다.
         Target target = new Target();
         Target proxy = proxy(target);
         ExecutorService pool = Executors.newFixedThreadPool(3);
@@ -190,7 +182,6 @@ class DistributedLockAopRedisTest {
                                 return null;
                             });
             a.get();
-            // A 가 끝난 직후에도 B 가 잡은 락은 남아 있어야 한다.
             assertThat(template.hasKey("test-lock"))
                     .as("A 의 해제가 B 의 락을 지웠다: %s", target.events)
                     .isTrue();

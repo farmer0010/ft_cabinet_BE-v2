@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** 챗봇 검색 평가용 자료구조와 계산. 보고서 서식은 ChatbotRetrievalEvaluationTest 가 맡는다. */
 final class ChatbotEvalSupport {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -30,7 +29,6 @@ final class ChatbotEvalSupport {
             Boolean enabled,
             List<String> questions) {}
 
-    /** alsoAccept: 질문이 둘 이상의 FAQ 에 걸쳐 있어 정답을 하나로 못 박기 어려울 때, 함께 정답으로 인정할 FAQ. */
     record EvalItem(String expected, String question, List<String> alsoAccept) {
         Set<String> accepted() {
             Set<String> set = new HashSet<>();
@@ -44,10 +42,6 @@ final class ChatbotEvalSupport {
 
     record EvalSet(List<EvalItem> inScope, List<String> outOfScope) {}
 
-    /**
-     * FAQ 를 병합·개명하면 평가 질문 파일의 정답 키(expected)가 낡는다. 평가 질문 파일은 결과를 보고 고치지 않는 것이 원칙이라, 파일은 그대로 두고 이
-     * 별칭표(faq-key-aliases.json: 옛 키 → 새 키)로 읽을 때만 새 키로 바꾼다.
-     */
     static EvalSet applyAliases(EvalSet set, Map<String, String> aliases) {
         List<EvalItem> items = new ArrayList<>();
         for (EvalItem item : set.inScope()) {
@@ -91,7 +85,6 @@ final class ChatbotEvalSupport {
         }
     }
 
-    /** 같은 문장은 한 번만 임베딩한다(학습곡선처럼 같은 질문을 여러 번 검색할 때). */
     static final class CachingEmbedder {
         private final EmbeddingPort port;
         private final Map<String, float[]> cache = new HashMap<>();
@@ -118,7 +111,6 @@ final class ChatbotEvalSupport {
             return item.accepted().contains(predicted());
         }
 
-        /** 정답이 몇 번째에 있는지(1부터). 없으면 0. */
         int rank() {
             for (int i = 0; i < rankedKeys.size(); i++) {
                 if (item.accepted().contains(rankedKeys.get(i))) {
@@ -145,7 +137,6 @@ final class ChatbotEvalSupport {
             return s1() - s2();
         }
 
-        /** 제안 모드: 임계값 이상인 상위 3개 후보 중에 정답이 있는가. */
         boolean suggestionHit(double threshold) {
             for (int i = 0; i < Math.min(3, rankedKeys.size()); i++) {
                 if (rankedScores.get(i) >= threshold
@@ -173,7 +164,6 @@ final class ChatbotEvalSupport {
             return fraction(in.stream().filter(Probe::top3).count(), in.size());
         }
 
-        /** 예측한 FAQ 가 정답 FAQ 와 같은 카테고리인 비율(정답으로 인정된 FAQ 들의 카테고리 포함). */
         double categoryTop1() {
             long hit =
                     in.stream()
@@ -206,7 +196,6 @@ final class ChatbotEvalSupport {
         return whole == 0 ? Double.NaN : (double) part / whole;
     }
 
-    /** 색인을 만들어(선택한 변형만) 평가 질문 전체를 검색한다. */
     static SetResult probe(
             List<SeedFaq> faqs,
             List<List<Integer>> selection,
@@ -270,7 +259,6 @@ final class ChatbotEvalSupport {
         return selection;
     }
 
-    /** FAQ 마다 변형 k 개만 쓴다. offset 으로 어느 변형부터 쓸지 돌려 가며 평균을 낼 수 있게 한다. */
     static List<List<Integer>> firstK(List<SeedFaq> faqs, int k, int offset) {
         List<List<Integer>> selection = new ArrayList<>();
         for (SeedFaq faq : faqs) {
@@ -285,7 +273,6 @@ final class ChatbotEvalSupport {
         return selection;
     }
 
-    /** 제안 모드(임계값 이상인 후보만 보여 줌)와 자동 답변 모드를 함께 보기 위한 한 줄. */
     record Row(
             double threshold,
             double coverage,
@@ -317,7 +304,6 @@ final class ChatbotEvalSupport {
         return grid;
     }
 
-    /** 점수가 몰려 있는 구간을 0.01 단위로 보여 준다(e5 처럼 점수가 좁게 몰리는 모델은 0.05 단위로는 안 보인다). */
     static List<Double> fineGrid(SetResult result) {
         double[] in = result.in().stream().mapToDouble(Probe::s1).sorted().toArray();
         double maxOos = result.out().stream().mapToDouble(OosProbe::s1).max().orElse(0);
@@ -338,7 +324,6 @@ final class ChatbotEvalSupport {
         return grid.stream().map(t -> row(result, t)).toList();
     }
 
-    /** 자동 답변(MATCHED) 기준: 범위 밖 수락 5% 이하, 1위 정답률 95% 이상, 커버리지 50% 이상인 가장 낮은 임계값. */
     static Row recommended(SetResult result) {
         List<Double> grid = new ArrayList<>(coarseGrid());
         grid.addAll(fineGrid(result));
@@ -365,7 +350,6 @@ final class ChatbotEvalSupport {
         return sorted[lower] + (sorted[upper] - sorted[lower]) * (pos - lower);
     }
 
-    /** 양성 점수가 음성 점수보다 클 확률(0.5 = 구분 못 함, 1.0 = 완벽). 한쪽이 비면 NaN. */
     static double auroc(List<Double> positive, List<Double> negative) {
         if (positive.isEmpty() || negative.isEmpty()) {
             return Double.NaN;
@@ -387,7 +371,6 @@ final class ChatbotEvalSupport {
         return probes.stream().map(p -> f.applyAsDouble(p)).toList();
     }
 
-    /** 자동 답변 규칙 "1위 점수 ≥ T 그리고 1·2위 차이 ≥ M" 의 한 칸. */
     record RuleCell(double coverage, double precision, double oosAccept) {}
 
     static RuleCell rule(SetResult result, double t, double m) {
@@ -401,7 +384,6 @@ final class ChatbotEvalSupport {
                 fraction(oos, result.out().size()));
     }
 
-    /** 범위 밖 질문의 최고점 분포에서 뽑은 임계값(범위 밖을 50/75/90/100% 걸러 내는 지점). */
     static List<Double> oosQuantileThresholds(SetResult result) {
         double[] out = result.out().stream().mapToDouble(OosProbe::s1).sorted().toArray();
         if (out.length == 0) {
@@ -414,7 +396,6 @@ final class ChatbotEvalSupport {
                 .toList();
     }
 
-    /** 틀린 질문의 (기대 → 예측) 쌍을 많이 나온 순으로 센다. */
     static List<Map.Entry<String, Integer>> confusions(SetResult result) {
         Map<String, Integer> counts = new HashMap<>();
         for (Probe p : result.in()) {
@@ -441,7 +422,6 @@ final class ChatbotEvalSupport {
         return new SetResult(a.categoryByKey(), in, out);
     }
 
-    /** 두 세트 모두에서 범위 밖 수락이 0% 이고 답변이 나가는 칸. 정밀도는 두 세트 중 낮은 쪽으로 비교한다. */
     record StableCell(double t, double m, RuleCell dev, RuleCell holdout) {
         double minPrecision() {
             return Math.min(dev.precision(), holdout.precision());

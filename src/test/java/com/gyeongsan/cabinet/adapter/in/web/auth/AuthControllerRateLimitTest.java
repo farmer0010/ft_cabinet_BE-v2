@@ -39,17 +39,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-/**
- * 감사 H-3: 비인증 {@code /v4/auth/reissue} 요청이 전역 {@code userApi} 한도를 소진해 모든 사용자를 429 로 막던 문제. 한도 키를 서명
- * 검증된 refresh token 의 사용자 ID 로 분리했는지, X-Forwarded-For 위조로 우회되지 않는지 실제 Resilience4j AOP 와 실제 MVC
- * 디스패치로 확인한다.
- */
 class AuthControllerRateLimitTest {
 
     private static final String SECRET =
             "test-secret-key-must-be-long-enough-for-hs256-algorithm-minimum-bits";
 
-    /** 전역 {@code userApi} 버킷을 쓰는 다른 엔드포인트(상점, 수박, 관리자, 카카오 설정 등을 대신한다). */
     static class UserApiProbe {
         @RateLimiter(name = "userApi")
         public String call() {
@@ -138,7 +132,6 @@ class AuthControllerRateLimitTest {
                             AuthController auth = context.getBean(AuthController.class);
                             UserApiProbe probe = context.getBean(UserApiProbe.class);
 
-                            // 쿠키 없는 reissue, 서명이 틀린 reissue, 로그인 없는 link 를 대량으로 보낸다.
                             for (int i = 0; i < 300; i++) {
                                 assertThatThrownBy(
                                                 () ->
@@ -161,11 +154,9 @@ class AuthControllerRateLimitTest {
                                         .isInstanceOf(ServiceException.class);
                             }
 
-                            // 전역 버킷(3회)은 그대로여야 한다. 수정 전에는 첫 호출부터 RequestNotPermitted 였다.
                             assertThat(probe.call()).isEqualTo("ok");
                             assertThat(probe.call()).isEqualTo("ok");
                             assertThat(probe.call()).isEqualTo("ok");
-                            // 대조: 한도 설정이 실제로 적용되고 있다는 확인.
                             assertThatThrownBy(probe::call).isInstanceOf(RequestNotPermitted.class);
                         });
     }
@@ -182,7 +173,6 @@ class AuthControllerRateLimitTest {
         verifyNoInteractions(redisValues);
         verifyNoInteractions(userRepository);
 
-        // 한도가 전혀 소모되지 않았으므로 정상 사용자는 한도(3회)만큼 그대로 쓸 수 있다.
         String refreshToken = loginAs(7L, "intra07");
         for (int i = 0; i < 3; i++) {
             assertThatCode(() -> controller.reissue(refreshToken, new MockHttpServletResponse()))
@@ -216,7 +206,6 @@ class AuthControllerRateLimitTest {
             try {
                 controller.reissue(tokenA, new MockHttpServletResponse());
             } catch (ServiceException ignored) {
-                // 한도 초과
             }
         }
 
@@ -276,7 +265,6 @@ class AuthControllerRateLimitTest {
                 .isInstanceOfSatisfying(
                         ServiceException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.TOO_MANY_REQUESTS));
-        // 다른 사용자는 영향이 없다.
         controller.linkSocialAccount(principalB, "kakao", request);
     }
 
@@ -297,7 +285,6 @@ class AuthControllerRateLimitTest {
                     mvc.perform(
                                     post("/v4/auth/reissue")
                                             .cookie(new Cookie("refresh_token", tokenA))
-                                            // 요청마다 다른 위조 IP
                                             .header(
                                                     "X-Forwarded-For",
                                                     "198.51.100." + i + ", 203.0.113." + i)
@@ -311,7 +298,6 @@ class AuthControllerRateLimitTest {
         assertThat(ok).as("위조 헤더를 바꿔도 허용 횟수는 한도(3)를 넘지 않는다").isEqualTo(3);
         assertThat(limited).isEqualTo(9);
 
-        // A 가 쓰던 위조 IP 를 B 가 그대로 써도 B 는 막히지 않는다(IP 로 키를 잡으면 생기는 문제).
         int statusB =
                 mvc.perform(
                                 post("/v4/auth/reissue")
@@ -322,7 +308,6 @@ class AuthControllerRateLimitTest {
                         .getStatus();
         assertThat(statusB).isEqualTo(200);
 
-        // A 의 Redis 조회는 허용된 3번뿐이다(한도를 넘은 9번은 Redis 까지 가지 않았다).
         verify(redisValues, org.mockito.Mockito.times(3)).get("RT:7");
     }
 }

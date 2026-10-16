@@ -21,15 +21,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
-/**
- * {@code @Scheduled} 작업이 공유하는 스레드 풀이 1개(Boot 기본값)가 아닌지 확인한다(감사 H-9). 풀이 1개면 한 작업이 멈출 때(예: 타임아웃 없는
- * 외부 호출) 연체 점검·알림·패널티 감소·로그타임 같은 다른 정기 작업이 전부 같이 멈춘다.
- */
 class SchedulerPoolConfigTest {
 
     private static final Path MAIN_YML = Path.of("src/main/resources/application.yml");
 
-    /** 한 작업은 풀을 붙잡고 멈추고, 다른 작업은 계속 돌아야 한다. */
     static class Probe {
         final CountDownLatch release = new CountDownLatch(1);
         final CountDownLatch blockerStarted = new CountDownLatch(1);

@@ -28,23 +28,6 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * "내 정보" 칩 라우팅 품질 평가(보고용). 실제 운영 규칙(칩 후보 하한 = suggest-threshold, 그리고 가장 비슷한 FAQ 점수 이상)을 그대로 쓰는
- * {@link ChatbotService} 로 질문을 물어, 두 가지를 잰다.
- *
- * <ul>
- *   <li>도달률: 개인화 질문(eval-personal.json)에 올바른 인텐트의 칩이 붙는 비율, 잘못된 칩이 붙는 비율
- *   <li>오탐률: 일반 FAQ·범위 밖 질문(eval-set, eval-holdout)에 칩이 붙는 비율. 붙은 질문은 전부 나열해 사람이 판단한다(예: "패널티 언제
- *       풀려요?" 는 칩이 붙는 편이 오히려 맞다)
- * </ul>
- *
- * <p>칩은 제안일 뿐이고 개인 정보는 사용자가 누르는 별도 API 에서만 나가므로, 이 수치는 안전이 아니라 <b>사용성</b> 지표다. 평가 질문은 인텐트
- * 표현(personal-intents.json)과 따로 한 번 쓴 것이며 결과를 본 뒤 고치지 않는다. 같은 저자의 질문이라 실제 분포에서는 수치가 더 낮을 수 있다. 기준은
- * 정하지 않고 리포트만 남긴다(첫 실측 후 정한다).
- *
- * <p>환경변수 CHATBOT_EVAL_MODELS_DIR 이 있으면 그 아래 모델마다 평가하고, 없으면 글자 n-gram 기준선만 돌린다. 결과는
- * build/chatbot-eval/personal.md.
- */
 class ChatbotPersonalEvaluationTest {
 
     record PersonalPositive(String intent, String question) {}
@@ -225,7 +208,6 @@ class ChatbotPersonalEvaluationTest {
                 report.append("\n</details>\n\n");
             }
 
-            // 오탐: 일반 FAQ 질문과 범위 밖 질문에 칩이 붙는 경우
             List<String> general = new ArrayList<>();
             for (EvalSet set : List.of(dev, holdout)) {
                 set.inScope().forEach(i -> general.add(i.question()));
@@ -249,7 +231,6 @@ class ChatbotPersonalEvaluationTest {
                 report.append("\n</details>\n\n");
             }
 
-            // 제3자 질문: 칩이 붙어도 보이는 것은 본인 정보뿐이다(참고용 수치)
             long thirdChips =
                     personal.thirdPerson().stream()
                             .filter(q -> service.ask(q).personalAction() != null)

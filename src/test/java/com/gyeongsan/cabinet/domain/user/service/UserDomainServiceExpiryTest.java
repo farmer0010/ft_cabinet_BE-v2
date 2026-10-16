@@ -73,7 +73,6 @@ class UserDomainServiceExpiryTest {
         assertThat(profile.getExpiredAtIso()).isEqualTo(expiredAt);
         assertThat(profile.getDaysRemaining()).isEqualTo(7);
         assertThat(profile.getOverdue()).isFalse();
-        // 호환: 기존 필드는 형식 그대로다.
         assertThat(profile.getExpiredAt())
                 .isEqualTo(
                         expiredAt.format(
@@ -90,7 +89,6 @@ class UserDomainServiceExpiryTest {
         MyProfileResponseDto profile = service.getMyProfile(USER_ID);
 
         assertThat(profile.getLentStartedAtIso()).isEqualTo(startedAt);
-        // 호환: 기존 필드는 형식 그대로다.
         assertThat(profile.getLentStartedAt())
                 .isEqualTo(
                         startedAt.format(

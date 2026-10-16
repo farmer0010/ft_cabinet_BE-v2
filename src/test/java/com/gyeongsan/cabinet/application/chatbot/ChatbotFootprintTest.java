@@ -24,18 +24,6 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * 임베딩 모델의 메모리와 지연을 잰다(리포트 전용, 기준을 두지 않는다).
- *
- * <p>측정 항목: 모델 로드 시간, 로드 전후 프로세스 RSS(ONNX 는 힙이 아니라 네이티브 메모리를 쓴다), 첫 질문(콜드) 지연, 질문 지연 p50/p95/p99,
- * 동시 2개/4개 요청 때의 처리량과 지연, 색인 전체(FAQ 질문 표현 전부)를 임베딩하는 시간.
- *
- * <p><b>이 값은 Azure 테스트 서버(B2)의 실측이 아니다.</b> GitHub Actions 러너에서 CPU 를 2코어로 제한(taskset -c 0,1)하고 같은
- * 설정(스레드 2)으로 돌린 참고치다. CPU 세대와 클럭이 달라 지연은 서버와 다를 수 있다. 서버 실측은 챗봇을 켠 뒤 /actuator/metrics 의
- * chatbot.process.rss.bytes, chatbot.ask.duration 으로 한다.
- *
- * <p>환경변수 CHATBOT_EVAL_MODELS_DIR 가 있어야 실행된다(없으면 건너뜀). 결과는 build/chatbot-eval/footprint.md.
- */
 class ChatbotFootprintTest {
 
     private static final int WARM_RUNS = 200;
@@ -144,7 +132,6 @@ class ChatbotFootprintTest {
                 }
             }
             long modelBytes = Files.size(dir.resolve("model.onnx"));
-            // 힙 정리가 RSS 를 흔들지 않게 기준값을 잡기 전에 한 번 정리한다(그래도 RSS 는 몇십 MB 흔들릴 수 있다).
             System.gc();
             OptionalLong rssBefore = ProcessRssMetrics.currentRssKb();
             String heapBefore = heapMb();
@@ -165,7 +152,6 @@ class ChatbotFootprintTest {
                 adapter.embed("준비 확인");
                 double coldMs = ms(System.nanoTime() - coldStart);
 
-                // 색인 전체를 임베딩하는 시간(시작할 때와 FAQ 를 고칠 때마다 한 번 일어난다)
                 long indexStart = System.nanoTime();
                 for (String v : variants) {
                     adapter.embed(TextNormalizer.normalize(v));

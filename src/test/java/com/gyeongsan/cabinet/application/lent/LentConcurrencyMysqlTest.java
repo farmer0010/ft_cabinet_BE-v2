@@ -79,22 +79,13 @@ import org.springframework.web.multipart.MultipartFile;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * 같은 유저의 동시 요청이 대여권 한 장으로 여러 번 처리되지 않는지 실제 MySQL(운영 8.0, 테스트 8.4) + 실제 Redis 분산락 + 실제 서비스 코드로 확인한다.
- * 요청 둘을 배리어로 동시에 출발시킨다. Docker 가 없으면 건너뛴다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class LentConcurrencyMysqlTest {
 
     private static final int TRIALS = 25;
 
-    /**
-     * 활성 대여를 읽은 직후 이만큼 기다리게 해서 "읽은 뒤 쓰기 전" 구간을 넓힌다(0 이면 꺼짐). 반납과 관리자 변경이 겹치는 경합을 우연에 맡기지 않고 재현하려는
-     * 테스트용 훅이다.
-     */
     private static volatile long lentReadDelayMillis = 0;
 
-    /** AI 청결 검사 결과. false 로 두고 forceReturn=true 로 부르면 수동 반납 경로를 탄다. */
     private static final AtomicBoolean AI_OK = new AtomicBoolean(true);
 
     private static GenericContainer<?> redis;
@@ -220,11 +211,6 @@ class LentConcurrencyMysqlTest {
                         });
     }
 
-    /**
-     * 기본은 엔티티가 선언한 {@code idx_cabinet_visible_num}(유니크)이 있는 스키마(운영과 같음)다. image 끝에 "-noindex" 를 붙이면
-     * 그 인덱스를 지운 스키마로 돌린다 — 인덱스가 없으면 {@code WHERE visible_num = ? FOR UPDATE} 가 PK 순으로 테이블을 훑으며 모든
-     * 행을 잠가 락 순서가 달라지므로, 인덱스가 없는 환경(과거 테스트 서버, 인덱스를 걸기 전 운영)에서도 락 순서가 안전한지 확인한다.
-     */
     private static void withContext(String imageSpec, Consumer<Fixture> body) throws Exception {
         boolean noIndex = imageSpec.endsWith("-noindex");
         String image =
@@ -414,7 +400,6 @@ class LentConcurrencyMysqlTest {
         }
     }
 
-    /** 작업들을 배리어로 동시에 출발시키고, 각 결과를 "OK" 또는 ErrorCode 이름(그 외 예외는 클래스명)으로 모은다. */
     private static List<String> runConcurrently(List<Callable<Void>> tasks) throws Exception {
         ExecutorService pool = Executors.newFixedThreadPool(tasks.size());
         try {
@@ -772,7 +757,6 @@ class LentConcurrencyMysqlTest {
                     for (int n = 0; n < TRIALS; n++) {
                         Long userId = f.newUser();
                         int cabinet = f.newCabinet(CabinetStatus.FULL);
-                        // 2일 연체: 패널티 6일
                         f.rent(userId, cabinet, LocalDateTime.now().minusDays(2));
 
                         List<String> results;
@@ -834,7 +818,6 @@ class LentConcurrencyMysqlTest {
                                                             return null;
                                                         },
                                                         () -> {
-                                                            // 반납이 대여를 읽은 뒤, 쓰기 전에 끼어든다.
                                                             Thread.sleep(150);
                                                             f.admin.updateCabinetStatus(
                                                                     cabinet,
@@ -905,8 +888,6 @@ class LentConcurrencyMysqlTest {
 
                             assertThat(results).as("trial %d", n).containsExactly("OK", "OK");
                             assertThat(f.endedLents(userId)).as("trial %d", n).isEqualTo(1);
-                            // 수동 반납은 사물함을 PENDING 으로 두므로 상태는 순서에 따라 BROKEN/PENDING 둘 다 정상이다.
-                            // 그러나 관리자가 바꾼 대여 유형은 어느 순서에서도 남아야 한다.
                             assertThat(f.cabinetLentType(cabinet))
                                     .as("trial %d: 관리자가 정한 대여 유형이 수동 반납에 덮어써짐", n)
                                     .isEqualTo("LAPISCINE");
@@ -953,7 +934,6 @@ class LentConcurrencyMysqlTest {
                             throw new IllegalStateException(e);
                         }
 
-                        // 반납은 항상 성공하고, 이사는 성공하거나(그 뒤 새 사물함을 반납) 대여가 없어 실패한다.
                         assertThat(results.get(0)).as("trial %d %s", n, results).isEqualTo("OK");
                         assertThat(results.get(1))
                                 .as("trial %d %s", n, results)
@@ -1003,7 +983,6 @@ class LentConcurrencyMysqlTest {
                                                             return null;
                                                         },
                                                         () -> {
-                                                            // 이사가 대여를 읽은 뒤, 옛 사물함을 쓰기 전에 끼어든다.
                                                             Thread.sleep(150);
                                                             f.admin.updateCabinetStatus(
                                                                     old,

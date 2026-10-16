@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 관리자 작업 감사 기록. /v4/admin/** 이므로 ADMIN 권한만 접근할 수 있다. */
 @RestController
 @RequestMapping("/v4/admin/action-logs")
 @RequiredArgsConstructor
@@ -41,7 +40,6 @@ public class AdminActionLogController {
         return ApiResponse.success(adminActionLogQueryUseCase.getActionLog(batchId));
     }
 
-    /** 사물함 일괄 변경을 되돌린다. 그 사이 바뀐 것이 있으면 409 로 거부하고, 이미 되돌려졌어도 409 이다. */
     @PostMapping("/{batchId}/undo")
     public ApiResponse<UndoResponse> undo(
             @PathVariable String batchId,

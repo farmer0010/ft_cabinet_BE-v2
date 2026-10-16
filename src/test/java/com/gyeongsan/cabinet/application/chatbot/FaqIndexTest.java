@@ -27,7 +27,6 @@ class FaqIndexTest {
     @Test
     @DisplayName("점수 높은 순으로 돌려주고, 같은 FAQ 의 여러 표현 중에는 가장 비슷한 것 하나만 쓴다")
     void bestPerFaqSortedDescending() {
-        // 질문 벡터 (0.6, 0.8): 다른 표현 A 와 정확히 같고(1.0), B 와는 0.8, 대표 질문 A 와는 0.6
         List<FaqIndex.Hit> hits = index().search(new float[] {0.6f, 0.8f}, 5);
 
         assertThat(hits).hasSize(2);

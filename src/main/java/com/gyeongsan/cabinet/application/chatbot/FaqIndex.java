@@ -7,14 +7,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 메모리에 올려 둔 검색 색인. 한번 만들면 바뀌지 않아서 여러 요청이 동시에 읽어도 안전하다. FAQ 가 수백 건 규모라 전부 훑어도 충분히 빠르다. */
 public final class FaqIndex {
 
     public static final FaqIndex EMPTY = new FaqIndex(List.of(), Map.of());
 
     public record Entry(long faqId, String question, float[] vector) {}
 
-    /** FAQ 별로 가장 비슷했던 질문 표현과 점수. */
     public record Hit(Faq faq, String matchedQuestion, double score) {}
 
     private final List<Entry> entries;
@@ -29,7 +27,6 @@ public final class FaqIndex {
         return entries.size();
     }
 
-    /** 점수 높은 순으로 FAQ 단위(같은 FAQ 의 여러 표현 중 최고점)로 돌려준다. */
     public List<Hit> search(float[] query, int limit) {
         Map<Long, Hit> best = new HashMap<>();
         for (Entry entry : entries) {

@@ -20,11 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * 실제 모델 대신 '장난감 ONNX 모델'(scripts/chatbot/make_tiny_model.py 로 만든 몇 KB 짜리)로 어댑터의 배선을 검증한다: 토크나이저 로딩,
- * 입력 이름 처리, 출력 형태, 평균 풀링, 정규화. 기대값은 같은 모델을 파이썬 onnxruntime 으로 계산한 값이다. 의미 검색 품질은 이 테스트가 아니라
- * 평가(ChatbotRetrievalEvaluationTest)가 본다.
- */
 class OnnxEmbeddingAdapterTest {
 
     private static final Path DIR = Path.of("src/test/resources/fixtures/chatbot/tiny-model");

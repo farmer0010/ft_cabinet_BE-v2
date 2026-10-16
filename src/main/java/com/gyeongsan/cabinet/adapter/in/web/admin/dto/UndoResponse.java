@@ -3,7 +3,6 @@ package com.gyeongsan.cabinet.adapter.in.web.admin.dto;
 import com.gyeongsan.cabinet.domain.cabinet.model.CabinetStatus;
 import java.util.List;
 
-/** Undo 결과 요약. undoBatchId 는 이 Undo 자체의 감사 기록 batchId 이다. */
 public record UndoResponse(
         String undoBatchId,
         String originalBatchId,

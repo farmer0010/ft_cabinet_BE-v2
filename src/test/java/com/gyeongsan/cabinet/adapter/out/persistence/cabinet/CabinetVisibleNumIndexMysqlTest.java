@@ -24,18 +24,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * {@code Cabinet} 엔티티의 {@code idx_cabinet_visible_num}(유니크) 선언이 두 환경에서 기대대로 동작하는지 실제 MySQL 로 확인한다.
- *
- * <ul>
- *   <li>테스트 서버처럼 인덱스 없이 만들어진 기존 테이블에 {@code ddl-auto=update} 로 부팅하면 인덱스가 자동으로 생긴다
- *   <li>같은 번호가 이미 중복돼 있으면 부팅은 실패하지 않고(경고만) 인덱스만 못 만든다 — 그래서 적용 전에 중복 확인이 필요하다
- * </ul>
- */
 @Testcontainers(disabledWithoutDocker = true)
 class CabinetVisibleNumIndexMysqlTest {
 
-    /** 인덱스가 선언되기 전 Hibernate 가 만들던 cabinet 테이블(인덱스 없음). */
     private static final String OLD_CABINET_DDL =
             "create table cabinet (id bigint not null auto_increment, grid_col integer,"
                     + " floor integer, lent_type varchar(16) not null, max_user integer not null,"

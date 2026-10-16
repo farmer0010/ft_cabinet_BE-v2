@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** 반납 결과(잔여일/연체/패널티)가 실제 패널티 로직과 같은 기준으로 만들어지는지 확인한다. */
 class LentReturnResultTest {
 
     private static final Long USER_ID = 9L;
@@ -94,7 +93,6 @@ class LentReturnResultTest {
     @Test
     @DisplayName("만료일 당일이라도 만료 시각이 지났으면 연체이고 패널티 3일이 붙는다 (현재 패널티 로직 그대로)")
     void returnOnExpiryDayAfterExpiry() {
-        // 표시는 현재 패널티 판정과 같아야 한다. 화면의 경고와 실제 패널티가 어긋나면 안 된다.
         activeLentExpiringAt(LocalDate.now().atStartOfDay());
 
         LentReturnResult result = service.processReturnTransaction(USER_ID, "1234", "photo");

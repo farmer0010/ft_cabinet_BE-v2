@@ -108,7 +108,6 @@ public class AdminActionLogPersistenceAdapter implements AdminActionLogPort {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException e) {
-            // 감사 기록을 못 남기면 그 작업도 롤백되어야 하므로 삼키지 않고 던진다.
             throw new IllegalStateException("감사 로그 직렬화에 실패했습니다.", e);
         }
     }

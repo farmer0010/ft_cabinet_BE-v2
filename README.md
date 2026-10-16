@@ -1,1092 +1,171 @@
-
-# 🗄️ 42Cabi Gyeongsan Ver 1.6
-
-> **42 경산 캠퍼스 지능형 사물함 대여/반납 서비스**<br>
-> 사용자의 편의성, 공정한 이용, 게임화(Gamification), 그리고 **시스템의 안정성**을 모두 갖춘 REST API 서버입니다.
-
-<br>
-
-## 🏗️ System Architecture (시스템 아키텍처)
-
-> **Dockerized Infra & Monitoring System**<br>
-> Nginx 리버스 프록시와 Prometheus/Grafana 모니터링 시스템이 구축되었습니다.
-
-```mermaid
-graph TD
-    %% 클라이언트 및 진입점
-    Client(["User Client<br>Web/Mobile"]) -->|HTTP / Port 80| Nginx["🦁 Nginx Web Server<br>Reverse Proxy"]
-    
-    %% 백엔드 영역
-    subgraph "Backend Container"
-        Nginx -->|"Proxy Pass<br>Port 8080"| SpringBoot["☕ Core API Server<br>Spring Boot 3.5"]
-        Security["Spring Security<br>JWT Filter"]
-        Scheduler["Schedulers<br>Lent/Logtime (ShedLock)"]
-    end
-
-    %% 모니터링 영역 (New)
-    subgraph "Monitoring System"
-        Prometheus["🔥 Prometheus<br>Metric Collector"]
-        Grafana["📊 Grafana<br>Visualization"]
-        
-        SpringBoot -.->|"/actuator/prometheus"| Prometheus
-        Prometheus -->|"Data Source"| Grafana
-    end
-
-    %% 데이터 영역
-    subgraph "Data Persistence"
-        MariaDB[("🐬 MariaDB 10.6<br>Main DB")]
-    end
-
-    %% 클라우드 관리형 서비스
-    subgraph "Cloud Managed Services"
-        Redis[("☁️ Azure Managed Redis<br>Token/Cache/ShedLock")]
-    end
-
-    %% 외부 서비스
-    subgraph "External Services"
-        AI_Server["🤖 AI Server<br>Python FastAPI"]
-        Intra_API["42 Intra API<br>OAuth2"]
-        Kakao_API["💬 Kakao API<br>OAuth2"]
-        Google_API["🔍 Google API<br>OAuth2"]
-        Slack["Slack Bot<br>Web API"]
-        Azure_Blob["☁️ Azure Blob<br>Image Storage"]
-    end
-
-    %% 연결 관계
-    SpringBoot -->|Read/Write| MariaDB
-    SpringBoot -->|Cache/Session| Redis
-    SpringBoot -->|"WebClient<br>Async Request"| AI_Server
-    AI_Server -->|"Analysis Result"| SpringBoot
-    SpringBoot -->|"OAuth2 Auth"| Intra_API
-    SpringBoot -->|"OAuth2 Link/Auth"| Kakao_API
-    SpringBoot -->|"OAuth2 Link/Auth"| Google_API
-    SpringBoot -->|API Call| Slack
-    SpringBoot -->|"Image Upload"| Azure_Blob
-    Scheduler -.->|"Distributed Lock"| Redis
-    Security -.->|"Verify RT"| Redis
-```
-
-<br>
-
-## 🗺️ User Flow (서비스 이용 흐름도)
-
-> 사용자가 로그인부터 반납, 상점 이용까지 경험하는 주요 프로세스입니다.
-
-```mermaid
-flowchart TD
-    %% 노드 스타일 정의
-    classDef start fill:#f9f,stroke:#333,stroke-width:2px,color:black;
-    classDef process fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:black;
-    classDef decision fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:black;
-    classDef endNode fill:#eeeeee,stroke:#333,stroke-width:2px,color:black;
-
-    Start((Start)):::start --> Login["🔐 42 Intra 로그인"]:::process
-    Login --> Main["🏠 메인 페이지 / 대시보드"]:::process
-
-    %% 메인 페이지에서의 분기
-    Main --> Action_Lent{"사물함 대여?"}:::decision
-    Main --> Action_My{"내 정보 관리?"}:::decision
-    Main --> Action_Store{"상점 이용?"}:::decision
-    Main --> Action_Attend{"출석 체크?"}:::decision
-    Main --> Action_Calendar{"일정 확인?"}:::decision
-
-    %% 1. 대여 프로세스
-    Action_Lent -- Yes --> Select["📦 사물함 선택"]:::process
-    Select --> Check_Lent{"대여 가능?"}:::decision
-    Check_Lent -- "No (Full/Ban)" --> Main
-    Check_Lent -- Yes --> Rent_Success["🔑 대여 완료"]:::process
-    Rent_Success --> Main
-
-    %% 2. 내 정보 & 반납 프로세스
-    Action_My -- Yes --> MyPage["👤 마이 페이지"]:::process
-    MyPage --> Return_Btn{"반납 하기?"}:::decision
-    Return_Btn -- Yes --> Upload["📸 인증 사진 업로드"]:::process
-    Upload --> AI_Check{"AI 청결도 검사"}:::decision
-    AI_Check -- Fail --> Manual["수동 반납 요청 (사유 입력)"]:::process
-    AI_Check -- Pass --> Return_Success["✅ 반납 완료"]:::process
-    Manual --> Main
-    Return_Success --> Main
-
-    %% 3. 상점 프로세스
-    Action_Store -- Yes --> Store["🏪 아이템 상점"]:::process
-    Store --> Buy{"아이템 구매?"}:::decision
-    Buy -- "연장권" --> Use_Ext["⏳ 기간 연장"]:::process
-    Buy -- "이사권" --> Use_Swap["🚚 사물함 이동"]:::process
-    Use_Ext --> Main
-    Use_Swap --> Main
-
-    %% 4. 출석 및 캘린더 프로세스
-    Action_Attend -- Click --> Reward["💰 코인 획득"]:::process
-    Action_Calendar -- Click --> Calendar["📅 캘린더 페이지"]:::process
-    Reward --> Main
-    Calendar --> Main
-
-    %% 종료
-    Main --> Logout{"로그아웃?"}:::decision
-    Logout -- Yes --> End((End)):::endNode
-```
-
-<br>
-
-## 📂 Project Structure (상세 프로젝트 구조)
-
-> **Core Architecture:** Hexagonal Architecture<br>
-> 도메인 로직이 외부 인프라(DB, Redis, AI, Slack 등)에 의존하지 않도록 **Port 인터페이스**로 추상화하고,<br>
-> 각 인프라 기술을 **Adapter**로 분리하여 테스트 용이성과 교체 가능성을 확보했습니다.
-
-```text
-.
-├── .github/workflows/gradle.yml        # Github Actions CI/CD 파이프라인
-├── .env                                # [Secret] DB, TimeZone, Root Password
-├── build.gradle                        # 의존성: WebFlux, Actuator, Resilience4j
-├── docker-compose.yaml                 # [Infra] Full Stack Orchestration
-├── nginx/conf.d/default.conf           # [Infra] Nginx Reverse Proxy Config
-├── prometheus/prometheus.yml           # [Infra] Monitoring Config
-├── src
-│   ├── main
-│   │   ├── java/com/gyeongsan/cabinet
-│   │   │   ├── CabinetApplication.java
-│   │   │   │
-│   │   │   ├── domain                  # ═══ 도메인 계층 (핵심 비즈니스 + 엔티티 모델) ═══
-│   │   │   │   ├── cabinet
-│   │   │   │   │   ├── model/Cabinet.java, CabinetStatus.java, LentType.java
-│   │   │   │   │   ├── port/in/CabinetQueryUseCase.java      # Inbound Port
-│   │   │   │   │   ├── port/out/CabinetRepositoryPort.java   # Outbound Port
-│   │   │   │   │   └── service/CabinetDomainService.java     # 도메인 서비스
-│   │   │   │   ├── user
-│   │   │   │   │   ├── model/User.java, Attendance.java, BannedUser.java, UserRole.java
-│   │   │   │   │   ├── port/in/UserUseCase.java
-│   │   │   │   │   ├── port/out/UserRepositoryPort.java
-│   │   │   │   │   ├── port/out/AttendanceRepositoryPort.java
-│   │   │   │   │   ├── port/out/BannedUserRepositoryPort.java
-│   │   │   │   │   └── service/UserDomainService.java
-│   │   │   │   ├── lent
-│   │   │   │   │   ├── model/LentHistory.java
-│   │   │   │   │   ├── port/in/LentUseCase.java
-│   │   │   │   │   ├── port/out/LentRepositoryPort.java
-│   │   │   │   │   ├── port/out/ReservationPort.java         # Redis 추상화
-│   │   │   │   │   ├── port/out/ImageUploadPort.java         # Azure 추상화
-│   │   │   │   │   ├── port/out/AiCheckPort.java             # AI 서버 추상화
-│   │   │   │   │   └── port/out/FtApiPort.java               # 42 API 추상화
-│   │   │   │   ├── item
-│   │   │   │   │   ├── model/Item.java, ItemHistory.java, ItemType.java
-│   │   │   │   │   ├── port/in/StoreUseCase.java
-│   │   │   │   │   ├── port/out/ItemRepositoryPort.java
-│   │   │   │   │   ├── port/out/ItemHistoryRepositoryPort.java
-│   │   │   │   │   └── service/StoreDomainService.java
-│   │   │   │   ├── coin
-│   │   │   │   │   ├── model/CoinHistory.java, CoinLogType.java
-│   │   │   │   │   └── port/out/CoinHistoryRepositoryPort.java
-│   │   │   │   ├── calendar
-│   │   │   │   │   ├── model/CalendarEvent.java
-│   │   │   │   │   ├── port/in/CalendarUseCase.java
-│   │   │   │   │   ├── port/out/CalendarEventRepositoryPort.java
-│   │   │   │   │   └── service/CalendarDomainService.java
-│   │   │   │   ├── alarm
-│   │   │   │   │   └── port/out/AlarmPort.java                # 알림 추상화
-│   │   │   │   ├── auth
-│   │   │   │   │   ├── port/in/LinkAccountUseCase.java        # Inbound Port
-│   │   │   │   │   ├── port/out/OauthLinkRepositoryPort.java  # Outbound Port
-│   │   │   │   │   ├── port/out/OAuthApiClientPort.java       # Outbound Port
-│   │   │   │   │   └── service/OauthLinkService.java          # 도메인 서비스
-│   │   │   │   ├── watermelon
-│   │   │   │   │   ├── port/in/GetWatermelonStatusUseCase.java, EnhanceWatermelonUseCase.java, BuyWatermelonItemUseCase.java, GetWatermelonLeaderboardUseCase.java
-│   │   │   │   │   ├── port/out/WatermelonRepositoryPort.java, WatermelonEventLogRepositoryPort.java
-│   │   │   │   │   ├── service/WatermelonEventService.java     # 도메인 서비스
-│   │   │   │   │   └── domain/                                 # 도메인 모델 & Config
-│   │   │   │   └── admin                                       # [Admin] Port 인터페이스 6개
-│   │   │   │       ├── port/in/AdminDashboardUseCase.java, AdminUserUseCase.java, AdminCabinetUseCase.java, AdminItemCoinUseCase.java, AdminBannedUserUseCase.java, AdminAlarmUseCase.java
-│   │   │   │       └── service/AdminDashboardService.java, AdminUserService.java, AdminCabinetService.java, AdminItemCoinService.java, AdminBannedUserService.java, AdminAlarmService.java
-│   │   │   │
-│   │   │   ├── application             # ═══ 애플리케이션 계층 (유스케이스 조합) ═══
-│   │   │   │   └── lent
-│   │   │   │       └── LentApplicationService.java   # 대여 프로세스 오케스트레이션
-│   │   │   │
-│   │   │   ├── adapter                 # ═══ 어댑터 계층 (인프라 구현체) ═══
-│   │   │   │   ├── in/web              # --- Inbound Adapter (Controller + DTO) ---
-│   │   │   │   │   ├── cabinet/CabinetController.java
-│   │   │   │   │   ├── user/UserController.java
-│   │   │   │   │   ├── lent/LentController.java
-│   │   │   │   │   ├── item/StoreController.java
-│   │   │   │   │   ├── calendar/CalendarEventController.java
-│   │   │   │   │   ├── admin/AdminController.java
-│   │   │   │   │   ├── auth/AuthController.java
-│   │   │   │   │   └── watermelon/WatermelonEventController.java
-│   │   │   │   ├── in/scheduler        # --- Inbound Adapter (Scheduler) ---
-│   │   │   │   │   ├── lent/LentScheduler.java              # D-7/D-1 알림, 자동 연장, 연체 처리
-│   │   │   │   │   └── user/LogtimeScheduler.java, LogtimeStreamListener.java
-│   │   │   │   ├── out/persistence     # --- Outbound Adapter (DB) ---
-│   │   │   │   │   ├── cabinet/CabinetPersistenceAdapter.java
-│   │   │   │   │   ├── user/UserPersistenceAdapter.java
-│   │   │   │   │   ├── user/AttendancePersistenceAdapter.java
-│   │   │   │   │   ├── user/BannedUserPersistenceAdapter.java
-│   │   │   │   │   ├── lent/LentPersistenceAdapter.java
-│   │   │   │   │   ├── item/ItemPersistenceAdapter.java
-│   │   │   │   │   ├── item/ItemHistoryPersistenceAdapter.java
-│   │   │   │   │   ├── coin/CoinHistoryPersistenceAdapter.java
-│   │   │   │   │   ├── calendar/CalendarEventPersistenceAdapter.java
-│   │   │   │   │   ├── auth/OauthLinkPersistenceAdapter.java
-│   │   │   │   │   └── watermelon/WatermelonPersistenceAdapter.java
-│   │   │   │   ├── out/external        # --- Outbound Adapter (외부 서비스) ---
-│   │   │   │   │   ├── ai/AiServerAdapter.java       # AI 서버 통신
-│   │   │   │   │   ├── azure/AzureBlobAdapter.java    # Azure 이미지 업로드
-│   │   │   │   │   ├── slack/SlackAlarmAdapter.java    # Slack DM 전송
-│   │   │   │   │   ├── ft/FtApiAdapter.java            # 42 API 통신
-│   │   │   │   │   ├── kakao/KakaoOAuthApiClientAdapter.java
-│   │   │   │   │   └── google/GoogleOAuthApiClientAdapter.java
-│   │   │   │   └── out/cache           # --- Outbound Adapter (캐시) ---
-│   │   │   │       └── redis/ReservationRedisAdapter.java  # 사물함 예약
-│   │   │   │
-│   │   │   ├── alarm                   # [Alarm] 비동기 알림 이벤트 (Redis Streams)
-│   │   │   │   ├── dto/AlarmEvent.java
-│   │   │   │   ├── AlarmEventHandler.java
-│   │   │   │   ├── SlackAlarmStreamListener.java
-│   │   │   │   └── SlackBotService.java
-│   │   │   │
-│   │   │   ├── auth                    # [Auth] 스프링 시큐리티 및 JWT 필터링 설정
-│   │   │   │   ├── config/SecurityConfig.java, CookieOAuth2AuthorizationRequestRepository.java
-│   │   │   │   ├── domain/UserPrincipal.java
-│   │   │   │   ├── exception/CustomAccessDeniedHandler.java, CustomAuthenticationEntryPoint.java
-│   │   │   │   ├── jwt/JwtTokenProvider.java, JwtAuthenticationFilter.java
-│   │   │   │   ├── oauth/OAuth2SuccessHandler.java
-│   │   │   │   └── service/CustomOAuth2UserService.java
-│   │   │   │
-│   │   │   ├── common                  # [Common] 공용 응답/락/Redis 유틸
-│   │   │   │   ├── ApiResponse.java, dto/MessageResponse.java
-│   │   │   │   ├── lock/DistributedLock.java, DistributedLockAop.java
-│   │   │   │   └── redis/RedisService.java
-│   │   │   │
-│   │   │   ├── config                  # [Config] 인프라 빈 설정
-│   │   │   │   └── RedisConfig.java, RedisStreamConfig.java, ShedLockConfig.java, WebConfig.java
-│   │   │   │
-│   │   │   ├── global                  # [Global] 전역 설정, 예외 처리
-│   │   │   │   ├── aspect/LoggingAspect.java
-│   │   │   │   └── exception/ErrorCode.java, GlobalExceptionHandler.java, ServiceException.java
-│   │   │   │
-│   │   │   └── utils/FtApiManager.java # 42 API 통신 모듈
-│   │   │
-│   │   └── resources
-│   │       ├── application.yml
-│   │       ├── logback-spring.xml
-│   │       ├── secret.properties       # [Secret] Git 제외
-│   │       └── static/index.html
-│   │
-│   └── test
-│       └── java/com/gyeongsan/cabinet/CabinetApplicationTests.java
-```
-
-### 🔀 의존성 방향 (Dependency Rule)
-
-```mermaid
-graph LR
-    subgraph "Adapter 계층"
-        WEB["🌐 Web Adapter<br>(Controller)"]
-        DB["🗄️ Persistence Adapter<br>(JPA)"]
-        EXT["🔌 External Adapter<br>(AI, Slack, Azure, 42API)"]
-        CACHE["🔴 Cache Adapter<br>(Redis)"]
-    end
-
-    subgraph "Application 계층"
-        APP["⚙️ Application Service<br>(UseCase 조합)"]
-    end
-
-    subgraph "Domain 계층"
-        PORT_IN["📥 Inbound Port<br>(UseCase Interface)"]
-        DOMAIN["💎 Domain Service<br>(비즈니스 로직)"]
-        PORT_OUT["📤 Outbound Port<br>(SPI Interface)"]
-    end
-
-    WEB -->|의존| PORT_IN
-    PORT_IN -.->|구현| DOMAIN
-    PORT_IN -.->|구현| APP
-    DOMAIN -->|의존| PORT_OUT
-    APP -->|의존| PORT_OUT
-    DB -.->|구현| PORT_OUT
-    EXT -.->|구현| PORT_OUT
-    CACHE -.->|구현| PORT_OUT
-```
-
-<br>
-
-## 📊 Database Schema (ERD)
-
-> **Entity Relationship Diagram**<br>
-> 프로젝트의 데이터베이스 구조와 엔티티 간의 상관관계를 나타냅니다.
-
-```mermaid
-erDiagram
-    %% -------------------------------------------------------------------------------------
-    %% 관계 (Relationships) - 한글화
-    %% -------------------------------------------------------------------------------------
-    
-    USER ||--o{ ATTENDANCE : "출석체크 함"
-    USER ||--o{ LENT_HISTORY : "대여 기록 보유"
-    USER ||--o{ ITEM_HISTORY : "아이템 구매/사용 이력"
-    USER ||--o{ COIN_HISTORY : "코인 거래 이력"
-    USER ||--o{ CALENDAR_EVENT : "일정 등록"
-    USER ||--o{ OAUTH_LINK : "소셜 연동 정보 보유"
-    
-    CABINET ||--o{ LENT_HISTORY : "대여 이력 포함"
-    
-    ITEM ||--o{ ITEM_HISTORY : "아이템 정보 참조"
-
-    %% -------------------------------------------------------------------------------------
-    %% 엔티티 정의 (Entity Definitions)
-    %% -------------------------------------------------------------------------------------
-
-    USER {
-        Long id PK
-        Long version "낙관적 락 버전"
-        String name "유니크 - 인트라 ID"
-        String email "유니크 - 이메일"
-        String role "권한 - USER ADMIN MASTER"
-        Long coin "보유 코인"
-        Integer penaltyDays "패널티 일수"
-        Integer monthlyLogtime "월간 접속 시간"
-        LocalDateTime blackholedAt "블랙홀 날짜"
-        LocalDateTime deletedAt "탈퇴 날짜"
-        boolean slackAlarm "슬랙 알림 여부"
-        boolean emailAlarm "이메일 알림 여부"
-        boolean pushAlarm "푸시 알림 여부"
-        boolean isPisciner "피시너 여부"
-    }
-
-    ATTENDANCE {
-        Long id PK
-        Long user_id FK "유저 ID"
-        LocalDate attendanceDate "출석 날짜"
-    }
-
-    LENT_HISTORY {
-        Long id PK
-        Long user_id FK "유저 ID"
-        Long cabinet_id FK "사물함 ID"
-        LocalDateTime startedAt "대여 시작일"
-        LocalDateTime expiredAt "대여 만료일"
-        LocalDateTime endedAt "반납일 - null이면 대여중"
-        String returnMemo "반납 시 메모"
-        boolean isAutoExtension "자동 연장 설정"
-        String photoUrl "반납 사진 URL"
-    }
-
-    CABINET {
-        Long id PK
-        Integer visibleNum "사물함 번호"
-        String status "상태 - AVAILABLE FULL BROKEN PENDING DISABLED"
-        String lentType "타입 - PRIVATE LAPISCINE"
-        Integer maxUser "최대 수용 인원"
-        String statusNote "상태 비고"
-        Integer floor "층"
-        String section "구역"
-        Integer row "그리드 행 위치"
-        Integer col "그리드 열 위치"
-    }
-
-    ITEM {
-        Long id PK
-        String name "아이템 이름"
-        String type "타입 - EXTENSION SWAP LENT EXEMPTION"
-        Long price "가격"
-        String description "설명"
-    }
-
-    ITEM_HISTORY {
-        Long id PK
-        Long user_id FK "유저 ID"
-        Long item_id FK "아이템 ID"
-        LocalDateTime purchaseAt "구매 일시"
-        LocalDateTime usedAt "사용 일시 - null이면 미사용"
-    }
-
-    COIN_HISTORY {
-        Long id PK
-        Long user_id FK "유저 ID"
-        Long amount "거래량 - 양수 지급 음수 사용"
-        String type "ATTENDANCE WATERMELON ITEM_PURCHASE ADMIN_GRANT ADMIN_REVOKE"
-        String description "상세 사유"
-        LocalDateTime createdAt "거래 발생 시각"
-    }
-
-    CALENDAR_EVENT {
-        Long id PK
-        String title "일정 제목"
-        String description "상세 설명"
-        LocalDate eventDate "일정 날짜"
-        LocalDateTime createdAt "생성일"
-        Long announcer_id FK "작성자 User"
-    }
-
-    BANNED_USER {
-        Long id PK
-        String intraId "차단된 유저 인트라 ID"
-        String reason "차단 사유"
-        LocalDateTime bannedAt "차단 일시"
-    }
-
-    OAUTH_LINK {
-        Long id PK
-        Long user_id FK "유저 ID"
-        String provider "소셜 공급사 - kakao, google"
-        String providerId "소셜 고유 ID"
-        String providerEmail "소셜 이메일"
-        LocalDateTime linkedAt "연동 일시"
-    }
-```
-
-### 스키마 관리 (Flyway)
-
-- 스키마의 단일 출처는 `src/main/resources/db/migration/` 이다. **V1** 은 운영 DB(`cabi`)의 `mysqldump --no-data` 를 `scripts/db/sanitize_baseline.py` 로 정제한 베이스라인(12개 테이블, `idx_cabinet_visible_num` 유니크 인덱스 포함), **V2~V5** 는 이후 추가분(관리자 감사 로그, `user.ft_grade`, FAQ)이다.
-- 새 DB 는 `FLYWAY_ENABLED=true` 로 부팅하면 V1~V5 가 순서대로 적용된다. **운영처럼 이미 스키마가 있는 DB 는 사람이 `baseline 1` 을 한 번 수동으로 찍어야 하며, `baselineOnMigrate` 는 쓰지 않는다.** V1 파일에는 `CREATE TABLE` 만 둔다(`FlywayBaselineV1GuardTest` 가 막음).
-- 운영 적용 절차, 테스트 서버(`ddl-auto` update → validate) 전환, 이력 상태별 대처는 [`docs/db/FLYWAY_BASELINE.md`](docs/db/FLYWAY_BASELINE.md) 를 따른다.
-
-<br>
-
-## 📜 Version History (개발 연혁)
-
-| 버전 | 주요 변화 | 상세 내용 |
-| :--- | :--- | :--- |
-| **Ver 0.1** | **MVP** | 핵심 대여/반납 로직 구현, DB 비관적 락(Pessimistic Lock) 적용 |
-| **Ver 0.2** | **Security** | 민감 정보 분리(`.env`), 스케줄러 N+1 문제 해결, 로깅 시스템 구축 |
-| **Ver 0.3** | **Auth** | **Spring Security + JWT** 도입 (Stateless 전환), 42 OAuth2 연동 |
-| **Ver 0.4** | **Gamification** | **패널티($D*3$)**, **아이템 상점(이사/연장/감면)** 구현 |
-| **Ver 0.5** | **AI & Admin** | **AI 청결도 검사**, **Exif 보안**, 관리자 수동 승인 프로세스, 블랙홀 유저 보호 |
-| **Ver 0.6** | **Infra & DevOps** | **Docker Compose**, **Nginx**(Reverse Proxy), **Prometheus & Grafana**(Monitoring) 도입 |
-| **Ver 0.7** | **Stability & UX** | **반납/이사 사유 입력**, **코인 동시성 제어(낙관적 락)** 보안 패치 |
-| **Ver 0.8** | **Auto-Extension** | **자동 연장 시스템**, **스케줄러 고도화(D-7/D-1 알림)**, 관리자 모니터링 API 추가 |
-| **Ver 0.9** | **Logic Refinement** | **블랙홀 유예(D+7)**, **스케줄러 최적화(시간분산)**, **Intra ID 알림**, 블랙홀 대여제한 해제 |
-| **Ver 1.0** | **Production Release** | **인앱 카메라 전용 모드**, **코인 거래 추적 시스템**, **캘린더 일정 관리**, **블랙리스트 관리 API**, Rate Limiting, 하드코딩 값 외부화 등 프로덕션 안정화 완료 |
-| **Ver 1.1** | **Hexagonal Architecture** | 레이어드 → **헥사고날(Ports & Adapters)** 아키텍처 전환. **18개 Port 인터페이스**, **14개 Adapter**, **5개 Domain Service** 구축. 도메인 로직의 인프라 독립성 확보 및 테스트 용이성 강화. API 계약 변경 없음 |
-| **Ver 1.2** | **Social Login & Extension** | 카카오 및 구글 소셜 로그인 연동 모듈 추가. 헥사고날(Ports & Adapters) 아키텍처에 부합하도록 인증 및 연동 구조 리팩토링 및 다형성(Strategy Pattern) 적용. 연동용 API 엔드포인트 공통화 (`/v4/auth/link/{provider}`) 및 예외 복구 흐름 개선 |
-| **Ver 1.3** | **Pisciner Identification & Cabinet Restriction** | 42 API `cursus_users`를 활용한 피시너 자동 식별(`cursus_id=9` 판별). 피시너 전용 사물함(`LAPISCINE` 타입) 대여 제한 적용. 관리자 LentType 일괄 변경 API 추가. 피시너 연장 차단. 본과정 합류 시 자동 전환 |
-| **Ver 1.4** | **Azure Redis & Stability** | **Azure Managed Redis** 연동 및 내장 레디스 완전 제거. **ShedLock**을 통한 분산 서버 스케줄러 동시성 제어 적용. JWT Access Token에 role 등 Claims 포함(최신 상태 반영을 위해 인증 시 DB 조회는 유지, 향후 최적화 예정). 12-Factor App 보안 구성을 통한 환경 변수 분리 및 SSL 단방향 적용 |
-| **Ver 1.5** | **Redis Streams Async Queue** | 대규모 트래픽 확장에 대비하여 **Redis Streams** 기반 비동기 이벤트 큐 시스템 구축. 외부 통신(Slack 알림 발송, 42 API 로그타임 집계)에 의한 메인 서버 블로킹 방지 및 분산 워커 처리 적용 |
-| **Ver 1.6** | **Core Refactoring & Isolation** | **비관적/낙관적(Redis) 분산 락**을 상황에 맞게 적용(사물함 대여 동시성 제어, 코인 사용 등). **Rich Domain Model**로 전환하여 서비스 레이어의 비즈니스 응집도 향상. **Hexagonal Architecture(Package by Feature)** 완전 적용으로 도메인별 디렉토리 철저한 분리 구축. **Jacoco/Spotless/Pre-commit** 도입으로 코드 품질 검증 자동화 완비 |
-
-<br>
-
-## 🛠 Tech Stack
-
-| 분류 | 기술 |
-| :--- | :--- |
-| **Backend** | Java 17, **Spring Boot 3.5.8**, Spring Security, Spring Data JPA |
-| **Database** | MariaDB 10.6, **Azure Managed Redis** (Token/Cache/ShedLock/Streams) |
-| **Infra** | **Docker Compose**, Azure App Service, **Nginx** (Reverse Proxy) |
-| **Monitoring** | **Prometheus** (Metrics), **Grafana** (Visualization), **Actuator** |
-| **Stability** | **Graceful Shutdown**, **DB Indexing**, **Resilience4j**, **Logback (Rolling)** |
-| **Tools** | Gradle, **Slack Bot (Web API)**, **Spring Actuator** |
-| **AI Module** | **WebFlux (WebClient)**, Python FastAPI (Image Analysis) |
-
-<br>
-
-## 🚀 Key Features (상세 기능 설명)
-
-### 1. 🏗️ 탄탄한 인프라 및 모니터링 (Infrastructure & Monitoring)
-* **Nginx Reverse Proxy:** 80 포트로 유입되는 트래픽을 관리하며, 실제 유저 IP(`X-Forwarded-For`)를 백엔드로 안전하게 전달합니다.
-* **Full Dockerization:** 백엔드, DB, Redis, Nginx, 모니터링 툴까지 `docker-compose`로 한 번에 오케스트레이션합니다.
-* **Prometheus & Grafana:** JVM 메모리, CPU 사용량, DB 커넥션 풀 상태를 실시간 시각화하여 장애를 사전에 감지합니다.
-
-### 2. 🤖 개선된 AI 반납 시스템 (AI-Powered Return)
-* **AI 청결도 검사:** 반납 시 업로드한 사물함 내부 사진을 Python(FastAPI) AI 서버로 실시간 전송. 쓰레기나 짐 방치 여부를 분석하여 자동 승인/거절 처리.
-* **인앱 카메라 검증 (In-App Camera):** 갤러리 업로드를 차단하고 **앱 내 카메라로만 촬영**하도록 강제하여, 과거 사진이나 캡처본을 이용한 어뷰징을 원천 차단했습니다. (Exif 메타데이터 의존성 제거)
-* **수동 반납 (사유 입력):** AI 검사 실패 시, 사용자가 직접 **사유를 입력하고 강제 반납**을 요청할 수 있습니다. 사물함은 `PENDING` 상태가 되며 관리자가 해당 사유를 확인 후 승인합니다.
-
-### 3. 🍉 수동 출석 & 황금 수박 이벤트 (New in v5.0)
-* **수동 출석:** 기존 자동 집계 방식을 폐지하고, 유저가 홈페이지의 **[출석하기]** 버튼을 직접 눌러야 코인을 획득하도록 변경 (유저 리텐션 강화).
-* **보상 체계:**
-    * **Daily:** 매일 1회 **100 코인** 지급.
-    * **Golden Watermelon:** 매월 **20회차** 출석 달성 시 **2,000 코인** 보너스 지급.
-
-### 4. 🛡️ 시스템 안정성 및 성능 (Robustness & Performance)
-* **상황 맞춤형 락 분리 적용:** 
-    * 사물함 선착순 대여 등 트랜잭션 충돌이 빈번한 곳에는 **Pessimistic Lock(비관적 락)**을 적용하여 성능과 정합성을 보장.
-    * **같은 유저의 동시 요청**(대여·수동 연장·이사)은 사용자 행 비관적 락으로 직렬화한다(대여권 1장으로 두 번 처리되는 것을 방지). 락 순서는 항상 **사용자 → 사물함**이며, 사용자 락은 트랜잭션의 첫 DB 조회여야 한다. 이사의 예약 확인은 사물함 행 락을 잡은 뒤 트랜잭션 안에서 한다. **반납**(AI/수동)과 **패널티 감면**도 같은 순서를 따른다: 반납은 사용자 락 → 사물함 락을 잡은 뒤 처리해 관리자의 상태 변경·Undo 와 사물함 행을 서로 덮어쓰지 않고(사물함 ID 는 락 전에 트랜잭션 밖에서 가볍게 읽고, 그 사이 대여가 다른 사물함으로 바뀌었으면 다시 시도한다), 감면은 사용자 락으로 직렬화한다. **이사**는 옛·새 사물함을 둘 다 잠그되 **ID 오름차순**으로 잡는다(관리자 일괄 변경·Undo 와 같은 순서라, 서로의 사물함으로 동시에 이사하는 두 유저도 데드락이 나지 않는다). 이때 PK 로 잠근 새 사물함을 같은 트랜잭션에서 `findByVisibleNumWithLock` 으로 다시 찾지 않는다: `CABINET.VISIBLE_NUM` 에 인덱스가 없는 스키마(엔티티에 인덱스 정의가 없어 Hibernate 가 만든 테스트·데모 DB)에서는 그 쿼리가 PK 순으로 테이블을 훑으며 행을 잠가 교착이 나기 때문이다. 현재 `Cabinet` 엔티티는 `idx_cabinet_visible_num`(유니크)을 선언하고 있어 인덱스가 있는 환경에서는 해당 행만 잠기지만(운영에는 2026-10-07 에 같은 이름으로 직접 적용), 인덱스가 없는 환경에서도 락 순서가 안전하도록 이 규칙을 지킨다(테스트가 두 스키마를 모두 검증).
-    * **분산 락(`@DistributedLock`)**은 값에 요청별 토큰을 저장하고, 해제할 때 Lua 로 "내 토큰일 때만" 지운다. lease 가 만료된 뒤 먼저 끝난 요청이 다음 요청의 락을 지우지 않는다. 락을 못 얻으면 **409(`LOCK_001`, 현재 처리 중인 요청)**로 응답한다. lease 만료로 겹쳐 실행되는 경우의 최종 안전은 DB 행 락이 담당한다.
-    * 코인, 이사권 등 충돌 빈도가 낮으나 정합성이 생명인 곳에는 **Optimistic Lock(낙관적 락, `@Version`)** 적용.
-    * Redis Streams 분산 워커 및 스케줄러 동시성 제어에는 **Redis 기반 분산 락(ShedLock 등)** 적용.
-* **비동기 이벤트 큐 (Redis Streams):** 무거운 외부 API 통신(슬랙 알림 전송, 3,000명 단위의 42 API 로그타임 집계)을 메인 스레드에서 분리하여 Redis 큐로 위임. 사용자 응답 지연을 방지하고 분산 워커 환경을 완벽하게 지원합니다.
-* **Graceful Shutdown:** 배포나 서버 재시작 시, 진행 중인 대여/반납 요청을 강제로 끊지 않고 **안전하게 완료한 뒤 종료**되도록 설정하여 데이터 유실을 방지합니다.
-* **DB 인덱싱(Indexing):** 대여 기록(`LentHistory`)의 핵심 컬럼(`user_id`, `cabinet_id`, `ended_at`)에 인덱스를 적용하여, 데이터가 수십만 건 쌓여도 **조회 속도가 저하되지 않도록 최적화**했습니다.
-* **Timezone 동기화:** Docker 컨테이너 레벨에서 `Asia/Seoul` 타임존을 강제하여, 서버 환경에 상관없이 **출석 체크와 연체료 계산**이 정확한 시간에 수행됩니다.
-* **WebClient Timeout:** AI 서버 통신 시 3초 타임아웃을 강제 적용하여 외부 장애 전파를 차단합니다.
-* **분산 스케줄러 락 (ShedLock):** Azure Managed Redis 기반의 분산 락을 도입하여 다중 서버(Scale-out) 환경이나 무중단 배포 시 스케줄러가 중복 실행되어 데이터 정합성이 깨지는 문제를 원천 차단했습니다.
-* **JWT 인증:** Access Token에 role 등 Claims를 포함하며, 인증 시에는 최신 사용자 상태 반영을 위해 DB 조회를 유지합니다(Claims 기반 조회 생략은 추후 최적화 과제). Refresh Token은 Redis로 안전하게 관리합니다.
-* **Logback Rolling Policy:** 로그 파일 용량(10MB/3GB) 제한으로 디스크 장애 예방.
-
-### 5. 🎮 게임화 및 상점 (Gamification)
-* **패널티($D*3$):** 연체 시 `연체일수 * 3` 만큼 대여 불가 기간을 부여하여 정시 반납 유도.
-* **아이템 상점:** 출석과 로그타임으로 모은 코인을 사용하여 아이템 구매.
-    * **🚚 이사권 (Swap):** 반납 절차 없이 즉시 다른 빈 사물함으로 이동.
-    * **⏳ 연장권 (Extension):** 현재 대여 중인 사물함 기간을 15일 연장. (최대 **5회** 연장 가능)
-    * **🛡️ 감면권 (Exemption):** 연체 패널티 기간 1일 감면.
-    * **⏳ 자동 연장 (Auto-Extension):** (New) 유저가 **자동 연장 설정(`ON`)**을 하고 연장권을 보유 중이라면, 대여 만료 1일 전(`D-1`) 시스템이 자동으로 아이템을 사용하여 연장합니다.
-
-### 6. 👑 관리자 기능 (Admin Dashboard)
-* **블랙홀 유저 보호:** 퇴소자 발생 시 자동 반납되지 않고 별도 목록으로 관리, 관리자가 짐 수거 확인 후 **강제 반납**.
-* **경제 밸런스 조절:** 상점의 아이템 가격을 API로 실시간 변경 가능.
-* **유저/사물함 관리:** 코인 수동 지급, 사물함 고장/복구 처리, 강제 반납, 로그타임 수정 등.
-
-### 7. 📅 캘린더 및 일정 관리 (New)
-* **일정 등록:** 관리자가 반납 마감일, 서버 점검 등 주요 일정을 등록하여 공지할 수 있습니다.
-* **월별 조회:** 사용자는 달력을 통해 월별 주요 이벤트를 한눈에 확인할 수 있습니다.
-
-### 8. 👮‍♂️ 관리자 감사 기능 강화 (Admin Audit)
-* **전체 유저 조회:** 페이징을 지원하는 전체 유저 목록 조회 API로 회원 관리 효율성을 높였습니다.
-* **반납 사진 감사:** 정상 처리된 반납 건에 대해서도 사진을 조회할 수 있어, 불시 점검 및 사물함 상태 모니터링이 가능합니다.
-
-### 9. ⚡ 이사 전용 실시간 예약 (Swap Reservation) [New]
-* **15분 선점(Ticketing):** 사용자가 이사하고 싶은 사물함을 발견하면, **이사 전용 예약**을 통해 **15분간** 해당 사물함을 선점할 수 있습니다.
-* **Redis TTL:** Redis를 활용한 만료 시간 관리로, 예약 후 15분 내에 이사를 완료하지 않으면 예약이 자동 취소되어 다른 사용자가 이용 가능해집니다.
-* **예약은 하나만:** 한 사용자는 예약을 하나만 가질 수 있고, 다른 사물함을 예약하면 기존 예약은 자동 취소됩니다(`DELETE /v4/lent/reservation`으로 직접 취소도 가능). 사물함을 대여하거나 이사하면 내 예약은 함께 정리됩니다. 내 `/me` 응답의 `reservedVisibleNum`, `reservationRemainingSeconds`로 현재 예약과 남은 시간을 볼 수 있습니다.
-
-### 잔여기간 표기 기준
-
-- `daysRemaining`은 **달력 날짜 기준**이다(만료일 − 오늘). 시각은 보지 않는다. `0`은 만료일 당일, 음수는 만료일이 지난 일수. `/me`, 반납 응답, 사물함 목록·상세(`daysRemaining`)가 모두 같은 기준이다. 사물함 상세는 대여 중이 아니면 `null`이다(목록은 0으로 채운다).
-- `overdue`는 반납 시 패널티 부과와 같은 판정(`now > expiredAt`, 시각 포함)이다. 그래서 만료일 당일(`daysRemaining == 0`)이어도 만료 시각이 지났으면 `overdue == true`일 수 있다.
-- `expiredAt`(`MM월 dd일 HH:mm`)은 기존 프론트 호환을 위해 그대로 두며, 새 화면은 `expiredAtIso`를 쓴다. 대여 시작 시각도 같은 방식이라 `/me` 의 `lentStartedAt`(문자열)은 유지하고 `lentStartedAtIso`(ISO)를 병행한다. ISO 값은 서버 시간대(Asia/Seoul)의 오프셋 없는 시각이다.
-
-### 월간 대여권 지급 기준 (트센)
-
-- 매월 1일, 지난달 로그타임이 기준 이상이면 `LENT` 대여권을 지급한다. 기준은 사용자마다 **하나만** 적용된다: 일반 80시간(4800분), 트센 15시간(900분). 두 기준을 동시에 만족해도 대여권은 1개다. 기준값은 `app.reward.lent-ticket.*`(환경변수 `LENT_TICKET_THRESHOLD_MINUTES`, `LENT_TICKET_TRANSCENDER_THRESHOLD_MINUTES`)로 바꿀 수 있고, 잘못된 값(0 이하, 트센 기준 > 일반 기준)이면 부팅이 실패한다.
-- **트센 판정**: 42 API `cursus_users`에서 `cursus.id == 21`인 항목의 `grade`가 정확히 `"Transcender"`일 때만 트센이다. `Cadet`, 값 없음, 처음 보는 값은 모두 일반 사용자다(확인된 값은 `Cadet`, `Transcender`뿐이며, 미확인 값은 경고 로그를 남긴다). 피시너(9)·재도전 피시너(66)의 `grade`는 읽지 않는다.
-- `grade` 원문은 `USER.FT_GRADE`(Flyway V4)에 저장하며 **로그인 때** 갱신된다. 지급일에는 로그타임이 15시간 이상 80시간 미만인 비-트센·비-피시너 사용자만 42 API로 `grade`를 다시 조회한다(실패하면 저장된 값을 유지).
-- 이미 미사용 대여권이 있으면 지급을 생략하며, 이때도 월간 로그타임은 초기화된다(기존 동작).
-
-### 사물함 오류제보 → 관리자 DM 전달 (Slack Report Forwarding)
-
-- 사물함 오류제보/문의 슬랙 채널에 올라온 **새 글을 관리자(권한이 `ADMIN` 또는 `MASTER` 인 유저 전원, 탈퇴자 제외)에게 DM 으로 그대로 전달**한다(내용은 거르지 않고, 입퇴장·주제 변경 같은 시스템 메시지만 제외). 봇이나 파일이 포함된 글도 전달한다.
-- **폴링 방식**: 기본 60초마다 `conversations.history` 를 호출한다(ShedLock 으로 서버가 여러 대여도 한 곳만 실행). 채널의 **최상위 메시지만** 다루며 스레드 답글은 전달하지 않는다(답글 수만 표시).
-- **중복 방지**: 채널별로 "마지막으로 확인한 메시지 ts"를 Redis(`slack:report:cursor:{channelId}`)에 저장한다. **커서가 없으면(처음 켠 경우, Redis 초기화 포함) 과거 글은 전달하지 않고 지금부터 시작**한다. 한 번에 20건을 넘게 쌓이면 최근 20건만 전달하고 나머지는 요약 한 줄로 대신한다.
-- 전달 실패는 로그만 남기고 다음 글로 넘어간다(`AlarmPort` 는 성공 여부를 알려주지 않는다).
-- **설정(기본은 꺼짐)**: `SLACK_REPORT_FORWARD_ENABLED=true`, `SLACK_REPORT_CHANNEL_ID`(채널 ID). 켠 상태에서 채널 ID 가 없으면 부팅이 실패한다. **수신자는 설정이 아니라 DB 에서 매번 조회**하므로 권한 변경이 바로 반영된다(슬랙 사용자명이 인트라 ID(`User.name`)와 같아야 DM 이 간다). 수신자가 0명이면 부팅은 되고 경고 로그만 남기며, 그 글은 **커서를 옮기지 않고 보류**했다가 관리자가 생기면 다음 주기에 전달한다(수신자 조회가 실패했을 때도 같다). 예전 `SLACK_REPORT_RECIPIENTS` 는 더 이상 읽지 않는다. 선택: `SLACK_REPORT_POLL_INTERVAL_MS`(기본 60000).
-- **Slack 앱 준비(사람이 해야 함)**: 봇 토큰 앱에 `channels:history`(비공개 채널은 `groups:history`) 권한을 추가해 재설치하고, 채널에 봇을 초대한다. `chat:write` 등 기존 DM 권한은 그대로 쓴다.
-
-### 슬랙 공지 → 카카오톡 알림 (Kakao Notify)
-
-- 슬랙 공지 채널에 새 글이 올라오면, **카카오 `talk_message` 동의를 해 두고 알림을 켠 유저**에게 카카오톡 "나에게 보내기"로 그 내용을 전달한다. 수신 대상 = (동의 유효) AND (알림 스위치 켜짐)이며, 발송 직전에 둘 다 다시 확인한다.
-- **동의 등록**(`POST /v4/users/me/kakao-notify/consent {authorizationCode}`): 로그인용 카카오 연동(`/v4/auth/link/kakao`)은 그대로 두고, `talk_message` 동의만 따로 받는다. 프론트가 `scope=talk_message` 로 카카오 동의 화면을 띄워 받은 인가 코드를 보낸다(`redirect_uri` 는 계정 연동 때와 같아야 한다). 서버는 ① 로그인용 카카오 연동이 있는지(없으면 거부) ② 돌아온 카카오 회원 번호가 연동한 계정과 같은지(다르면 거부, 받은 토큰은 버림) ③ `talk_message` 범위가 있는지 확인한 뒤 refresh_token 을 저장한다.
-- **경로가 `/v4/auth/**` 가 아닌 이유**: 보안 설정에서 `/v4/auth/**` 는 인증 없이 열려 있다(컨트롤러가 로그인 상태를 직접 가정). 보안 설정을 바꾸지 않고 로그인한 본인에게만 열리게 하려고 `/v4/users/me/kakao-notify/**`(인증 필요)에 두었다. 대상 유저는 JWT 에서만 얻는다.
-- **상태·스위치**: `GET /v4/users/me/kakao-notify`(`consented`, `alarmEnabled`, `receiving`), `PUT /v4/users/me/kakao-notify/alarm {enabled}`(켜려면 유효한 동의가 있어야 하며, 끄는 것은 항상 가능). 알림 스위치는 `USER.KAKAO_ALARM`(기본 꺼짐)이고 **첫 동의(또는 해지 후 재동의) 때 켜진다**. 이미 유효한 동의를 다시 받아도 유저가 꺼 둔 스위치는 되돌리지 않는다.
-- **토큰 저장**: 로그인용 `OAUTH_LINK` 와 분리된 `KAKAO_NOTIFY_CONSENT`(Flyway V6)에 **AES-256-GCM 으로 암호화한 refresh_token** 만 저장한다(access_token 은 저장하지 않고 보낼 때마다 refresh_token 으로 새로 받는다). 암호문은 유저 ID 에 묶여 있어 다른 유저 행에 옮겨 붙이면 복호화되지 않는다. 카카오가 새 refresh_token 을 주면(회전) 조건부 갱신으로 저장한다.
-- **해지 처리**: refresh_token 갱신이 `invalid_grant` 로 거절되거나(유저가 카카오에서 동의 해지·토큰 만료) 발송이 동의 항목 부족(-402)으로 거절되면 `revoked_at` 을 찍고 그 뒤로 대상에서 뺀다(사용한 토큰이 그대로일 때만 — 그 사이 유저가 다시 동의했다면 새 동의를 해지하지 않는다). 카카오 일시 장애는 해지하지 않고 그 사람만 건너뛴다. 복호화 실패(키 분실·변경)도 해지하지 않고 건너뛰며, 유저가 다시 동의하면 새 키로 덮어쓴다.
-- **전달 파이프라인**: 오류제보 포워더와 같은 구조다. 폴링(기본 60초, ShedLock `slackNoticeForwardTask`), 채널별 Redis 커서(`slack:notice:cursor:{channelId}`, 오류제보 커서와 키가 다름)로 중복 방지, 커서가 없으면 과거 글은 보내지 않고 지금부터 시작, 시스템 메시지 제외, 5건 초과 시 최근 5건 + 요약 한 줄. 슬랙 표기(`<@U..>`, `<url|이름>`, `<!channel>`)는 평문으로 풀고 카카오 한도(200자)에 맞춰 자른다. 수신 대상이 0명이거나 조회에 실패하면 경고만 남기고 **커서를 옮기지 않아 공지가 사라지지 않게** 하되, 24시간(`max-hold-hours`)이 지난 공지는 새 수신자에게 쏟아내지 않도록 경고와 함께 건너뛴다. 개별 발송 실패는 로그만 남기고 다음 사람으로 넘어간다.
-- **설정(둘 다 기본 꺼짐)**: `KAKAO_NOTIFY_ENABLED=true` + `KAKAO_TOKEN_ENC_KEY`(base64 32바이트, 예: `openssl rand -base64 32`, 없거나 형식이 틀리면 부팅 실패) 가 동의/스위치 API 를 켠다. `SLACK_NOTICE_FORWARD_ENABLED=true` + `SLACK_NOTICE_CHANNEL_ID` 가 공지 전달을 켠다(`KAKAO_NOTIFY_ENABLED` 가 꺼져 있으면 부팅 실패). 선택: `SLACK_NOTICE_POLL_INTERVAL_MS`(기본 60000), `SLACK_NOTICE_LINK_URL`(요약 메시지와 퍼머링크 폴백에 쓰는 기본 링크, 기본 `FRONTEND_URL`, 카카오 앱에 등록된 도메인이어야 함), `SLACK_NOTICE_PERMALINK_ENABLED`(기본 false, 아래 참고), 긴 공지 요약 `SLACK_NOTICE_SUMMARY_ENABLED`(기본 false)·`GEMINI_API_KEY`·`SLACK_NOTICE_SUMMARY_MODEL`(기본 `gemini-3.6-flash`)·`SLACK_NOTICE_SUMMARY_THINKING_LEVEL`(기본 `low`)·`SLACK_NOTICE_SUMMARY_TIMEOUT`(기본 `8s`).
-- **메시지를 누르면 열리는 링크**: 카카오 메시지 링크는 앱에 등록된 웹 도메인이어야 해서 **기본은 항상 `SLACK_NOTICE_LINK_URL`**(기본 `FRONTEND_URL`)이다. `SLACK_NOTICE_PERMALINK_ENABLED=true` 로 켜면 공지 메시지가 해당 슬랙 글의 퍼머링크(`chat.getPermalink`)를 열도록 보내고, 조회 실패나 http(s) 가 아닌 값이면 기본 링크로 폴백한다(공지 한 건당 한 번 조회, "이전 N건 생략" 요약은 항상 기본 링크). 슬랙 도메인을 카카오 앱이 받아 주는지는 실환경 확인이 필요하다.
-- **긴 공지 요약(기본 꺼짐)**: 카톡 텍스트 템플릿은 200자 제한이라, 접두어(`📢 [공지] `)를 포함해 200자를 **넘는 공지만** Gemini API(`generateContent`)로 요약한다(넘지 않으면 호출하지 않음). 공지 한 건당 호출은 한 번이고 결과를 모든 수신자가 공유한다. 요약이 꺼져 있거나, 키가 없거나, 시간 초과·오류·빈 응답·차단·허용 길이 초과면 **기존 자르기(199자 + `…`)** 로 보내며 발송은 막지 않는다(WARN 로그에 원문은 남기지 않음). 구조: `NoticeSummarizerPort`(출력 포트) ← `GeminiNoticeSummarizerAdapter`(WebClient + 제한 시간 + Resilience4j 서킷 브레이커), 응답은 `NoticeSummarySanitizer` 가 URL·마크다운 링크·이모지·줄바꿈을 제거하고 길이를 검증한다. 슬랙 본문은 신뢰할 수 없는 입력이므로 고정 구분자로 감싸고 "데이터이지 지시가 아님"을 시스템 지시에 명시하며, 접두어와 링크는 모델이 아니라 코드가 붙인다. **켜면 공지 본문이 Google(해외)로 전송된다**(개인정보 고지·약관·무료 티어의 데이터 사용 조건 확인 필요). API 키는 환경변수로만 주입하고 로그·예외·`toString` 에 남기지 않는다.
-- **운영 주의**: ① **`KAKAO_TOKEN_ENC_KEY` 를 잃으면 저장된 동의가 전부 무효**가 된다(복호화 불가 → 발송 대상에서 사실상 빠지고, 유저가 다시 동의해야 함). 키를 안전한 곳에 따로 보관하고 코드·로그·DB 에 남기지 말 것. ② 키를 바꾸는 것도 같은 효과다(키 교체 절차는 아직 없음). ③ V6 은 `user` 테이블에 컬럼을 추가하고 새 테이블을 만들므로 `ddl-auto: validate` 인 운영은 Flyway 롤아웃 순서(baseline → `FLYWAY_ENABLED=true` → 배포)를 먼저 따라야 한다(기능을 꺼 둬도 필요). ④ Kakao 개발자 앱에 `talk_message` 동의항목과 메시지 링크 도메인 등록이 필요하다.
-
-### FAQ 챗봇 (Tier 1: 의미 검색 FAQ 매칭)
-
-- 질문을 임베딩(문장 벡터)으로 바꿔 미리 써 둔 FAQ 질문들과 코사인 유사도로 비교하고, **가장 비슷한 FAQ 의 정해진 답변을 그대로 돌려준다**. 문장을 생성하는 LLM 은 쓰지 않으므로 답변이 지어내질 일이 없다.
-- 결과는 세 가지다: `MATCHED`(점수와 1·2위 차이가 모두 기준 이상, 답변 반환 + 대안 후보 최대 2개), `SUGGESTED`(애매함, 비슷한 FAQ 최대 3개 제안), `UNMATCHED`(안내 문구).
-- **서버 내부 임베딩**: ONNX Runtime(Java) + DJL 토크나이저로 같은 JVM 안에서 계산한다. 질문이 외부 API 로 나가지 않는다. 동시 임베딩은 세마포어(기본 2)로 제한하고 넘치면 503 을 준다. jar 크기가 약 75MB 늘어난다(ONNX Runtime·토크나이저 네이티브 라이브러리 포함).
-- **FAQ 는 DB**(`faq`, `faq_question`, Flyway V5)에 저장하고 관리자 API 로 관리한다. 하나의 FAQ(답변)에 여러 질문 표현을 둘 수 있다. **임베딩은 저장하지 않고** 서버마다 메모리에 인덱스를 만든다. 서버는 30초마다 FAQ 변경(건수 + 최신 수정 시각)을 확인해 다시 만들고, 다른 서버에서 고친 내용도 그 안에 반영된다. 인덱스가 아직 준비되지 않았거나 모델을 못 불러오면 챗봇만 503 이고 서버는 정상 기동한다.
-- **개인정보**: 질문 원문은 저장도 로그도 하지 않는다. 결과별 건수만 `chatbot.ask{result=...}` 지표로 집계한다. 요청 로그(`LoggingAspect`)는 **값을 남기지 않는 것이 기본**이다: 숫자·불리언·열거형·날짜만 그대로 남기고 문자열, DTO, 파일, 인증 정보는 타입 이름만 남긴다(예전에는 컨트롤러 인자를 통째로 찍어 챗봇 질문과 반납 공유 비밀번호가 로그에 남았다). 접근 기록(누가, 언제, 어느 URI)은 남는다.
-- **초기 FAQ**: 테이블이 비어 있을 때만 `src/main/resources/chatbot/faq-seed.json`(26개, 질문 표현 180개)으로 채운다(`seed_key` UNIQUE 로 서버 여러 대의 동시 시작도 안전). **답변은 초안**이며 `docs/chatbot/FAQ_REVIEW.md` 의 "확인 필요" 항목을 사람이 검토해야 한다.
-
-| Method | URI | 설명 |
-| :--- | :--- | :--- |
-| `POST` | `/v4/chatbot/ask` | 질문(`{"question": "..."}`, 200자 이하)에 대한 FAQ 매칭 결과 |
-| `GET` | `/v4/chatbot/faqs` | 사용 중인 FAQ 를 카테고리별로 조회(검색 없이 둘러보기) |
-| `GET` | `/v4/chatbot/faqs/{id}` | FAQ 하나 조회 |
-| `POST` | `/v4/chatbot/personal` | **"내 정보" 조회**(개인화, 별도 플래그). `{"intent": "LENT_EXPIRY"}` 처럼 인텐트 이름만 받고, 대상은 항상 로그인한 본인 |
-| `GET` | `/v4/chatbot/personal/intents` | 칩으로 보여 줄 인텐트 목록(개인 정보 없음) |
-| `GET/POST/PUT/DELETE` | `/v4/admin/faqs`, `/v4/admin/faqs/{id}` | 관리자: FAQ 목록(비활성 포함)/등록/수정/삭제. 질문은 FAQ 당 최대 10개(각 200자), 답변 2000자 이하 |
-
-**설정(기본은 꺼짐)**
-
-| 환경변수 | 기본값 | 설명 |
-| :--- | :--- | :--- |
-| `CHATBOT_ENABLED` | `false` | `true` 여야 컨트롤러·인덱스·스케줄러가 켜진다 |
-| `CHATBOT_MODEL_DIR` | `/app/chatbot-model` | `model.onnx`, `tokenizer.json`, `model.properties` 가 있는 디렉터리(Docker 빌드가 채운다) |
-| `CHATBOT_MODEL_ID`, `CHATBOT_EMBEDDING_PREFIX`, `CHATBOT_MAX_TOKENS` | 비움 | 비워 두면 `model.properties` 를 따른다(e5 의 `query: ` 접두어 누락 방지). 값을 넣으면 그 값이 우선 |
-| `CHATBOT_MATCH_THRESHOLD` / `CHATBOT_MATCH_MARGIN` | `0.93` / `0.02` | **자동 답변(MATCHED)** 조건: 1위 유사도가 T 이상이고 1·2위 차이도 M 이상. e5 는 점수가 0.84~0.96 에 몰려서 절대 점수보다 1·2위 차이가 정답을 더 잘 가려낸다(정답 구분력 AUROC: 점수 0.59~0.75, margin 0.74~0.90). 평가의 공통 격자에서 두 세트 모두 범위 밖 수락 0%인 칸 중 골랐다(합산 커버리지 35.9%, 1위 정답률 94.3%). 모델이나 FAQ 를 바꾸면 다시 맞춘다 |
-| `CHATBOT_SUGGEST_THRESHOLD` | `0.88` | **후보 제안** 하한. 이 이상이면 비슷한 질문 후보(최대 3개)를 보여 주고, 사용자가 눌러 확정한다(틀린 후보의 피해가 작다). 근접 도메인 범위 밖 질문("사물함 크기")에도 후보가 나갈 수 있는 것은 감수한다 |
-| `CHATBOT_MATCH_ALTERNATIVES` | `2` | 자동 답변과 함께 "혹시 이 질문인가요?" 대안 후보를 최대 몇 개 돌려줄지(후보 하한 이상인 2위부터). 0 이면 끔 |
-| `CHATBOT_EMBEDDING_THREADS` | `2` | ONNX 스레드 수 |
-| `CHATBOT_EMBEDDING_PROVIDER` | `onnx` | `ngram` 은 모델 없이 글자 겹침만 보는 **개발용**(의미 검색 아님). 알 수 없는 값은 부팅 실패 |
-
-`/v4/chatbot/*` 는 전역 한도 `chatbotApi`(20/s)를 쓴다.
-
-**"내 정보" 답변 (개인화, 기본 꺼짐)**
-
-만료일·패널티·대여권 지급 조건·대여 불가 사유를 로그인한 본인 정보로 알려 준다. 생성형 모델 없이 **고정 문장에 값을 채우는 방식**이고, **읽기만 한다**(락도 상태 변경도 없어 대여 흐름과 경합하지 않는다).
-
-| 환경변수 | 기본값 | 설명 |
-| :--- | :--- | :--- |
-| `CHATBOT_PERSONAL_ENABLED` | `false` | `CHATBOT_ENABLED` 도 `true` 일 때만 켜진다. 꺼져 있으면 `/v4/chatbot/personal*` 는 404, `/ask` 응답의 `personalAction` 은 항상 null |
-| `CHATBOT_PERSONAL_RATE_PER_MINUTE` | `10` | 사용자별 분당 조회 한도(서버 메모리 기준이라 서버가 여러 대면 서버별 적용). 넘으면 429. 전역 `chatbotApi` 한도와 별개 |
-
-| 인텐트 | 알려 주는 것(응답 `facts` 의 화이트리스트) |
-| :--- | :--- |
-| `LENT_EXPIRY` | 사물함 번호, 만료 시각, 남은 일수(달력 기준, `/me` 와 같은 계산), 만료 시각 경과 여부 |
-| `PENALTY_STATUS` | 남은 패널티 일수, 해제 예정일(오늘 + 일수, 매일 자정 1일 감소) |
-| `LENT_TICKET_CONDITION` | 내 지급 기준(일반 4800분·트센 900분, 설정값), 이번 달 집계된 로그타임, 기준 충족 여부, 미사용 대여권 보유 여부, 다음 지급일(다음 달 1일) |
-| `LENT_BLOCKER_DIAGNOSIS` | 사용자 단위 사유만: 패널티 → 이미 대여 중 → 대여권 없음(`startLent` 검사 순서), 라피신 여부에 따른 대여 가능 사물함 종류 |
-
-**흐름과 보안 규칙**
-
-- 자유 질문(`/ask`)은 **칩만 제안**한다(`personalAction: {intent, label}`). 이 응답에는 개인 정보가 없고, 사용자가 칩을 눌러 `/v4/chatbot/personal` 을 호출해야 본인 정보가 나간다. 질문 문장은 "무엇을 볼지"만 고르고 "누구 것인지"는 고르지 못한다.
-- 조회 대상은 **JWT 의 `UserPrincipal` 하나뿐**이다. 요청 본문에서 받는 값은 인텐트 이름뿐이고, 본문에 `userId` 등을 실어도 무시한다(테스트: 컨트롤러 핸들러가 `@RequestBody`/`@AuthenticationPrincipal` 외 파라미터를 갖지 못함, 요청 DTO 필드는 `intent` 하나). 그래서 "다른 사람 만료일 알려줘" 같은 질문에 칩이 붙어도 보이는 것은 본인 정보뿐이다.
-- 응답 필드는 인텐트별 레코드로 **고정**되어 있고, 필드를 늘리면 `PersonalFactsContractTest` 가 실패해 리뷰를 강제한다. 이메일·코인 내역·이전 사용자의 반납 메모·다른 사용자 정보는 어떤 경로로도 실리지 않는다.
-- 사물함 단위 사유(남의 예약, 특정 사물함의 상태)는 특정 사물함을 지정해야 알 수 있고 다른 사람의 정보가 새어 나갈 수 있어 판단하지 않는다.
-- 응답은 `Cache-Control: no-store`, 값은 로그에 남기지 않는다(`LoggingAspect` 는 문자열·DTO 인자의 값을 기록하지 않는다). 지표는 `chatbot.personal{intent,outcome}` 건수만 센다(사용자 ID 태그 없음).
-- **정책 표현**: 반납 패널티는 만료 *시각*이 지나면 붙고 스케줄러의 연체 전환은 만료일 끝까지 유예한다(미해결 불일치). 문장은 "만료일까지 안전" 같은 약속 없이 만료 시각과 "지나면 패널티 대상"이라는 사실만 말한다.
-- 대여권 지급 문장의 로그타임은 매일 새벽 갱신된 집계값(어제까지)이다. 지급 생략(미사용 대여권 보유) 조건도 문장에 포함한다.
-
-**칩 라우팅**: 인텐트별 질문 표현(`src/main/resources/chatbot/personal-intents.json`, 인텐트당 8개)을 같은 임베딩 모델로 첫 질문 때 색인한다. 질문이 후보 하한(`suggest-threshold` 0.88) 이상으로 인텐트와 비슷하고 **가장 비슷한 FAQ 만큼 가까울 때만** 칩을 붙인다(FAQ 결과 자체는 바뀌지 않는다). 평가는 Actions 의 "챗봇 모델 평가" 에서 `ChatbotPersonalEvaluationTest` 가 `personal.md` 로 남긴다(도달률·오탐률·제3자 질문, 기준 없이 보고용; 질문은 `eval-personal.json`, 인텐트 표현과 겹치지 않고 결과를 본 뒤 고치지 않는다). 칩은 제안이라 이 수치는 안전이 아니라 사용성 지표다.
-
-**모델 고정과 배포(SHA256 검증)**
-
-1. `chatbot-models.lock` 에 모델의 저장소·revision·파일 경로·SHA256 을 적는다. 후보 비교(평가 + 정답 벡터 대조) 결과 **`e5`(intfloat/multilingual-e5-small)로 확정**했고 minilm 은 폐기했다. 새 모델을 평가할 때는 `PENDING` 으로 추가해 Actions(resolve 모드)가 출력하는 값을 옮겨 적는다.
-2. GitHub Actions 의 **"챗봇 모델 평가 / 고정"**(수동 실행)이 두 모델을 내려받아 다음을 요약(Job summary)에 보여 주고, lock 파일에 옮겨 적을 `meta|…`/`file|…` 줄을 출력한다. 기본은 기준을 적용하지 않아(`enforce=false`) 표만 보고 빨간불이 뜨지 않는다.
-   - **구현 정합성**: 같은 모델 저장소의 원본 가중치를 sentence-transformers(파이썬)로 돌린 정답 벡터(`golden.json`)와 Java 어댑터의 임베딩을 같은 문장 31개로 비교한다(코사인). 평가 점수가 낮을 때 "모델이 약한 것"과 "구현이 틀린 것"을 가르는 첫 번째 확인이다. 1.0 에 가까워야 한다.
-   - **검색 품질**: 개발 세트(`eval-set.json`)와 보류 세트(`eval-holdout.json`)의 top-1/top-3, 임계값별 표(0.05 단위 + 점수가 몰린 구간 0.01 단위), 점수·margin 이 정답을 가려내는 신호인지(AUROC), 자동 답변 규칙(점수 ≥ T 그리고 margin ≥ M) 격자, 틀린 질문 전체와 혼동 쌍, FAQ 당 변형 수에 따른 학습곡선.
-   - **평가 질문의 한계**: 모두 FAQ 를 쓴 사람이 만들었고 실제 학생 질문이 아니다(챗봇은 질문 원문을 수집하지 않는 설계). 수치는 모델·설정 사이의 상대 비교로만 읽는다. 보류 세트는 FAQ 변형·개발 세트와 겹치지 않게 따로 쓴 보고용이며, **보류 세트 결과를 보고 FAQ 변형이나 임계값을 고치지 않는다**(테스트가 세 집합이 서로 겹치지 않는지 확인한다).
-3. 모델을 고르고 출력된 줄로 lock 파일을 고쳐 커밋하면, 이후 `docker build --build-arg CHATBOT_MODEL=<id> .` 는 **고정된 revision 의 파일만 받고 SHA256 이 다르거나 `PENDING` 이 남아 있으면 실패**한다. `CHATBOT_MODEL` 을 주지 않으면(기본) 아무것도 받지 않으며 기존 빌드와 같다.
-4. 평가 기준(`CHATBOT_EVAL_ENFORCE=true`, 로컬 기본값. 개발 세트에 적용): 후보 모델은 top-1 `CHATBOT_EVAL_MIN_TOP1`(기본 0.80) 이상이어야 하고, "범위 밖 오답 수락률 5% 이하 · 정밀도 95% 이상 · 커버리지 50% 이상"인 임계값이 존재해야 한다. 로컬에서는 `CHATBOT_EVAL_MODELS_DIR` 아래에 `<id>/model.onnx`, `tokenizer.json`, `model.properties`(정합성 검사는 `golden.json` 도, `scripts/chatbot/golden_vectors.py` 로 생성)를 두고 `./gradlew test --tests '*ChatbotRetrievalEvaluationTest' --tests '*ChatbotGoldenVectorTest'` 로 같은 평가를 돌린다(모델이 없으면 ngram 기준선만 계산).
-
-**메모리·지연(참고)**: CI 러너에서 CPU 를 2코어로 제한해 잰 값이다(Azure 실측 아님). e5 fp32 모델 파일 448MB, 로드 약 1.9초, 프로세스 RSS 약 +874MB(로드 중 최고 약 +1.2GB), 첫 질문 약 31ms, 질문 1개 p50/p95 약 10/13ms, 색인 전체(질문 표현 180개) 임베딩 약 2.4초. 모델은 JVM 힙이 아니라 네이티브 메모리를 써서 `jvm.memory.*` 지표에는 안 보인다. 챗봇을 켠 서버에서는 `/actuator/metrics` 의 `chatbot.process.rss.bytes`(RSS), `chatbot.process.rss.peak.bytes`, `chatbot.ask.duration`(p50/p95/p99)과 로그("임베딩 모델 로드 완료", "색인 완료")로 확인한다. CI 측정은 평가 워크플로우의 "메모리·지연 측정" 단계에서 다시 돌릴 수 있다.
-
-**운영 반영 순서**: ① V5 는 새 테이블 두 개를 만들고 엔티티가 항상 등록되므로 `ddl-auto: validate` 인 운영에서는 Flyway 롤아웃(baseline → `FLYWAY_ENABLED=true` → 배포)을 먼저 해야 한다 ② 모델을 고정하고 `CHATBOT_MODEL` 빌드 인자를 배포 워크플로우에 넣는다 ③ `CHATBOT_ENABLED=true` 와 임계값을 설정한다 ④ `docs/chatbot/FAQ_REVIEW.md` 를 검토한 뒤 관리자 API 로 답변을 고친다.
-
-### 10. 🍉 수박씨 강화 이벤트 & 독립 상점 (Watermelon Event) [New]
-* **강화 시도 및 확률 매트릭스:** 레벨별 기본 확률에 따라 0강~최대 10강까지 강화 성공/유지/하락/파괴를 롤링합니다.
-* **비료 및 방지권 기능:** 프리미엄 비료(성공확률 보정) 및 위험한 비료(성공률 대폭 상승, 단 7강 이상 사용 불가) 사용이 가능하며, 실패 페널티를 막아줄 하락 방지권 및 파괴 방지권(파괴 무효화 대신 현재 레벨에서 -2강)을 제공합니다.
-* **코인 연동 및 전용 상점:** 유저의 기존 코인 재화와 완벽히 연동되어 작동하며, 전용 상점 API(`POST /v4/watermelon-event/shop/buy`)를 통해 코인을 지급하여 아이템을 구매할 수 있습니다.
-* **3중 정렬 리더보드 최적화:** `highest_level`, `highest_level_achieved_at`, `total_attempts` 3중 정렬이 적용된 동적 리더보드 랭킹을 성능 최적화 복합 인덱스 하에 고속으로 조회합니다.
-
-### 11. 🏊 피시너 식별 & 사물함 제한 (Pisciner Identification) [New]
-* **42 API 연동 자동 식별:** OAuth 로그인 시 42 API의 `cursus_users` 배열을 분석하여 피시너 여부를 자동 판별합니다. (`cursus_id=9`만 존재하고 `cursus_id=21`이 없으면 피시너)
-* **전용 사물함 제한:** 피시너는 관리자가 `LAPISCINE` 타입으로 지정한 사물함만 대여/예약/이사 가능합니다. 일반 유저는 `LAPISCINE` 사물함을 사용할 수 없습니다.
-* **연장 차단:** 피시너는 대여 기간이 고정되어 연장권/대여권 사용이 차단됩니다.
-* **자동 전환:** 피시너가 본과정(42cursus)에 합류하면 재로그인 시 자동으로 일반 유저로 전환됩니다.
-* **관리자 일괄 변경:** 관리자가 관리 페이지에서 사물함을 선택하여 `LentType`을 `LAPISCINE`으로 일괄 변경 가능합니다. 재배포 없이 실시간으로 피시너 전용 구역을 관리합니다.
-
-<br>
-
-## 🔄 System Logic & Sequence Diagrams
-
-> 주요 비즈니스 로직의 상세 흐름입니다.
-
-### 1. 사물함 대여 (동시성 제어 적용)
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as 👤 사용자
-    participant Controller as 🎮 LentController
-    participant UseCase as 📥 LentUseCase
-    participant Service as ⚙️ LentApplicationService
-    participant DB as 🗄️ Database
-
-    User->>Controller: "대여하기" 클릭 (POST /lent)
-    activate Controller
-    Controller->>UseCase: startLent()
-    activate Service
-    
-    Note right of DB: "🔒 비관적 락 (Pessimistic Lock)<br/>동시 요청 방지"
-    Service->>DB: "SELECT ... FOR UPDATE"
-    
-    alt 🚫 이미 대여중 (FULL)
-        Service-->>Controller: 예외 발생 (LENT_FULL)
-        Controller-->>User: "400 Error (이미 대여된 사물함입니다.)"
-    else ✅ 대여 가능
-        Service->>DB: LentHistory 생성
-        Service->>DB: 사물함 상태 변경 (FULL)
-        Service-->>Controller: 대여 성공
-        Controller-->>User: "200 OK (대여 완료!)"
-    end
-    deactivate Service
-    deactivate Controller
-```
-
-### 2. AI 스마트 반납 (Smart Return)
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as 👤 사용자
-    participant Controller as 🎮 LentController
-    participant Service as ⚙️ LentApplicationService
-    participant AI as 🤖 AI Server (Python)
-    participant Azure as ☁️ Azure Blob
-
-    User->>Controller: "반납 사진 전송 (POST /return)"
-    activate Controller
-    Controller->>Service: 반납 요청 위임
-    activate Service
-    
-    Service->>AI: 📡 이미지 청결도 분석 요청
-    activate AI
-    AI-->>Service: "✅ 분석 결과 (CLEAN / DIRTY)"
-    deactivate AI
-
-    alt ❌ 더러움 (AI 실패)
-        Service-->>Controller: 반납 거절
-        Controller-->>User: 400 Bad Request
-        Note over User, Controller: "💡 계속 실패 시 '수동 반납(사유 입력)' 요청 가능"
-    else ✅ 깨끗함
-        Service->>Azure: 📸 사진 업로드
-        activate Azure
-        Azure-->>Service: (URL 획득)
-        deactivate Azure
-
-        Service->>DB: 사물함 상태 변경 (AVAILABLE)
-        Service-->>Controller: 반납 성공
-        Controller-->>User: "200 OK (반납 완료!)"
-    end
-    deactivate Service
-    deactivate Controller
-```
-
-### 3. 아이템 구매 및 제한 (Item Purchase)
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as 👤 사용자
-    participant Service as ⚙️ StoreDomainService
-    participant DB as 🗄️ Database
-
-    User->>Service: "연장권 구매 요청 (buyItem)"
-    activate Service
-    
-    Service->>DB: "🔍 1. 현재 보유 개수 확인 (Inventory Check)"
-    Service->>DB: "🔍 2. 이번 달 구매 횟수 확인 (Monthly Check)"
-    
-    alt 🚫 제한 초과 (보유 2개 or 월 2회)
-        Service-->>User: "예외 발생 (LIMIT_EXCEEDED)"
-    else ✅ 구매 가능
-        Note right of DB: "🔒 낙관적 락 (@Version)<br/>중복 구매(Double Spending) 방지"
-        Service->>DB: "💰 코인 차감 & 아이템 지급"
-        Service-->>User: 구매 성공
-    end
-    deactivate Service
-```
-
-### 4. 이사권 사용 (Transaction Swap)
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as 👤 사용자
-    participant Service as ⚙️ LentApplicationService
-    participant AI as 🤖 AI Server
-    participant Azure as ☁️ Azure Blob
-    participant DB as 🗄️ Database
-
-    %% 0. 이사 예약 (선점)
-    User->>Service: "이사 예약 요청 (forSwap=true)"
-    activate Service
-    Service->>Service: Redis Key 저장 (TTL 15min)
-    Service-->>User: "200 OK (예약 완료)"
-    deactivate Service
-
-    User->>Service: "이사 요청 (사진 포함)"
-    activate Service
-    
-    %% 1. AI 검사
-    Service->>AI: 📡 청결도 분석 요청
-    activate AI
-    AI-->>Service: "✅ CLEAN"
-    deactivate AI
-
-    %% 2. 이미지 업로드
-    Service->>Azure: 📸 사진 업로드
-    activate Azure
-    Azure-->>Service: (URL 획득)
-    deactivate Azure
-
-    %% 3. 트랜잭션
-    rect rgb(240, 248, 255)
-        Note over Service, DB: 🔄 Atomic Transaction (Service)
-        Service->>DB: "1. 이사권 차감"
-        Service->>DB: "2. 기존 반납 처리 (URL 저장)"
-        Service->>DB: "3. 새 대여 생성"
-    end
-
-    alt 🚫 실패 시 (AI/DB Error)
-        Service->>DB: Rollback
-        Service-->>User: 에러 응답
-    else ✅ 성공 시 (Commit)
-        Service->>DB: Commit
-        Service-->>User: "200 OK (이사 완료)"
-    end
-    deactivate Service
-```
-
-### 5. 캘린더 일정 관리 (Calendar Management)
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Admin as 👮‍♂️ 관리자
-    actor User as 👤 사용자
-    participant Controller as 🎮 CalendarController
-    participant Service as ⚙️ CalendarDomainService
-    participant DB as 🗄️ Database
-
-    %% 관리자 일정 등록
-    Admin->>Controller: "일정 등록 (POST /admin/calendar)"
-    activate Controller
-    Controller->>Service: createEvent()
-    activate Service
-    Service->>DB: "일정 저장 (INSERT)"
-    Service-->>Controller: 등록 성공
-    Controller-->>Admin: "200 OK (일정 추가됨)"
-    deactivate Service
-    deactivate Controller
-
-    %% 사용자 일정 조회
-    User->>Controller: "달력 조회 (GET /calendar)"
-    activate Controller
-    Controller->>Service: getEvents(month)
-    activate Service
-    Service->>DB: "일정 목록 조회 (SELECT)"
-    Service-->>Controller: "이벤트 리스트 반환"
-    Controller-->>User: "200 OK (달력 데이터)"
-    deactivate Service
-    deactivate Controller
-```
-
-### 6. 수박씨 강화 및 방지권 보정 (Watermelon Enhancement)
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as 👤 사용자
-    participant Controller as 🎮 WatermelonEventController
-    participant Service as ⚙️ WatermelonEventService
-    participant Watermelon as 🍉 Watermelon (Domain)
-    participant UserEntity as 👤 User (Domain)
-    participant DB as 🗄️ Database
-
-    User->>Controller: 강화 시도 (POST /enhance)
-    activate Controller
-    Controller->>Service: enhance(userId, options)
-    activate Service
-
-    Service->>DB: User & Watermelon 조회 (Pessimistic Lock 적용)
-    DB-->>Service: User & Watermelon 반환
-
-    Service->>UserEntity: useCoin(enhancementCost)
-    UserEntity-->>Service: 코인 선차감 완료
-
-    Service->>Watermelon: useFertilizer(fertilizerType)
-    Watermelon-->>Service: 비료 선차감 완료 (인벤토리 -1)
-
-    Service->>Service: 주사위 롤링 (rawOutcome 도출)
-
-    alt 결과가 하락(DROP) 혹은 파괴(DESTROY) 이고 방지권 사용 활성화된 경우
-        Service->>Watermelon: applyEnhancement(rawResult, useDropProj, useDestroyProj)
-        Note over Watermelon: 방지권 보유량 확인 후<br/>결과 보정 (유지 혹은 -2강)<br/>및 방지권 차감 (-1)
-    else 그 외 (성공/유지 혹은 방지권 미사용/부족)
-        Service->>Watermelon: applyEnhancement(rawResult, false, false)
-    end
-
-    Service->>DB: User & Watermelon 상태 영속화 (Save)
-    Service->>DB: WatermelonEventLog 적재
-
-    Service-->>Controller: 결과 반환 (WatermelonEnhanceResult)
-    deactivate Service
-    Controller-->>User: ApiResponse<EnhanceResponse>
-    deactivate Controller
-```
-
-<br>
-
-## 🧪 API Specification (전체 API 목록)
-
-### 1. 🔐 인증 (Auth)
-| Method | URI | 설명 |
-| :--- | :--- | :--- |
-| `GET` | `/oauth2/authorization/42` | 42 Intra 로그인 (OAuth2) |
-| `POST` | `/v4/auth/reissue` | Access Token 재발급 |
-| `POST` | `/v4/auth/logout` | 로그아웃 (Refresh Token 삭제) |
-| `POST` | `/v4/auth/link/{provider}` | 카카오/구글 소셜 계정 연동 |
-
-### 2. 👤 유저 (User)
-| Method | URI | 설명 |
-| :--- | :--- | :--- |
-| `GET` | `/v4/users/me` | 내 정보 (현재 대여, 연체, 코인, **[NEW] 재화/아이템 사용 이력 포함**) 조회. 대여 중이면 `expiredAtIso`(ISO 만료 시각), `lentStartedAtIso`(ISO 대여 시작 시각), `daysRemaining`, `overdue` 포함 (`expiredAt`, `lentStartedAt`은 표시용 문자열로 유지). `isTranscender`(트센 여부) 포함 |
-| `POST` | `/v4/users/attendance` | **[NEW]** 수동 출석 체크 (코인 획득) |
-| `GET` | `/v4/users/attendance` | 이번 달 출석 현황 조회 |
-
-### 3. 📦 사물함 조회 (Cabinet)
-| Method | URI | 설명 |
-| :--- | :--- | :--- |
-| `GET` | `/v4/cabinets` | 건물/층별 사물함 배치도 및 상태 조회 |
-| `GET` | `/v4/cabinets/status-summary` | 층별 잔여 좌석 요약 정보 |
-| `GET` | `/v4/cabinets/status-summary/all` | 전체 건물/층 잔여 좌석 요약 정보 |
-| `GET` | `/v4/cabinets/{cabinetId}` | 사물함 상세 정보 (공유 사물함 인원 등) |
-
-### 4. 🔑 대여 및 반납 (Lent)
-| Method | URI | 설명 |
-| :--- | :--- | :--- |
-| `POST` | `/v4/lent/cabinets/{visibleNum}` | 사물함 대여 시작 |
-| `POST` | `/v4/lent/reservation/{visibleNum}` | **[NEW]** 사물함 예약 (15분 선점, 대여 중이면 이사 예약으로 자동 처리). 사용자는 예약을 **하나만** 가지며, 다른 사물함을 다시 예약하면 기존 예약은 자동 취소됩니다. 이미 예약한 사물함을 다시 예약하면 거부(`ALREADY_RESERVED`)하고 시간도 연장되지 않습니다. |
-| `DELETE` | `/v4/lent/reservation` | 내 예약 취소. 예약이 없으면 404(`RESERVATION_NOT_FOUND`). |
-| `POST` | `/v4/lent/check-image` | **[AI]** 반납 사진 사전 검증 (AI 청결도 검사만 선실행) |
-| `POST` | `/v4/lent/return` | **[AI/Manual]** 반납 (forceReturn=true 시 강제 반납/사유 입력). 응답 `data`에 `message`와 함께 `expiredAtIso`, `daysRemaining`, `overdue`, `penaltyAppliedDays`, `returnedAt` 포함 |
-| `POST` | `/v4/lent/swap/{newVisibleNum}` | **[Item]** 이사권을 사용해 사물함 이동 |
-| `POST` | `/v4/lent/extension` | **[Item]** 연장권을 사용해 기간 연장 |
-| `POST` | `/v4/lent/renew` | **[Ticket]** 대여권을 새로 사용하여 기간 연장 (31일) |
-| `PATCH` | `/v4/lent/extension/auto` | **[NEW]** 자동 연장 설정 ON/OFF 토글 |
-| `POST` | `/v4/lent/penalty-exemption` | **[Item]** 패널티 감면권 사용 |
-
-### 5. 🏪 상점 (Store)
-| Method | URI | 설명 |
-| :--- | :--- | :--- |
-| `GET` | `/v4/store/items` | 구매 가능한 아이템 목록 및 가격 조회 |
-| `POST` | `/v4/store/buy/{itemId}` | 아이템 구매 (코인 차감) |
-
-> **구매 API Error Codes:**
-> * `EXTENSION_ITEM_LIMIT_EXCEEDED`: 연장권은 최대 **5개**까지만 보유 가능.
-> * `EXTENSION_ITEM_PURCHASE_LIMIT_EXCEEDED`: 연장권은 매월 최대 **5회**만 구매 가능.
-
-### 6. 📅 캘린더 (Calendar) [New]
-| Method | URI | 설명 |
-| :--- | :--- | :--- |
-| `GET` | `/v4/calendar/events` | 월별 일정 목록 조회 |
-
-### 7. 🍉 수박씨 강화 이벤트 (Watermelon Event) [New]
-| Method | URI | 설명 |
-| :--- | :--- | :--- |
-| `GET` | `/v4/watermelon-event/me` | 내 강화 상태, 인벤토리, 랭킹 정보 조회 |
-| `POST` | `/v4/watermelon-event/enhance` | 수박씨앗 강화 시도 |
-| `POST` | `/v4/watermelon-event/shop/buy` | 이벤트 전용 상점 아이템 구매 |
-| `GET` | `/v4/watermelon-event/rankings` | 전역 리더보드 랭킹 페이징 조회 |
-| `GET` | `/v4/watermelon-event/logs` | 내 강화 히스토리 로그 목록 조회 |
-| `GET` | `/v4/watermelon-event/config` | 이벤트 설정 정보 (비용, 확률, 아이템 가격) 조회 |
-
-### 8. 🛡️ 관리자 (Admin)
-| Method | URI | 설명 |
-| :--- | :--- | :--- |
-| `GET` | `/v4/admin/dashboard` | 전체 통계 대시보드 |
-| `GET` | `/v4/admin/users` | **[NEW]** 전체 유저 목록 조회 (페이징) |
-| `GET` | `/v4/admin/users/{name}` | 특정 유저 정보 및 대여 이력 검색 |
-| `POST` | `/v4/admin/users/{name}/coin` | 유저에게 코인 수동 지급 |
-| `DELETE` | `/v4/admin/users/{name}/coin` | 유저 코인 수동 회수 |
-| `PATCH` | `/v4/admin/users/{name}/logtime` | 유저 로그타임 수동 수정 |
-| `POST` | `/v4/admin/users/{name}/penalty` | 유저에게 패널티 수동 부여 |
-| `DELETE` | `/v4/admin/users/{name}/penalty` | 유저 패널티 해제 (감면) |
-| `GET` | `/v4/admin/users/penalty` | 패널티 보유 유저 목록 조회 |
-| `POST` | `/v4/admin/users/{name}/items` | 유저에게 아이템 수동 지급 |
-| `DELETE` | `/v4/admin/users/{name}/items` | 유저 미사용 아이템 전체 회수 |
-| `POST` | `/v4/admin/users/{name}/role/admin` | 유저를 관리자로 승급 |
-| `DELETE` | `/v4/admin/users/{name}/role/admin` | 관리자 권한 해제 |
-| `PATCH` | `/v4/admin/cabinets/{visibleNum}` | 사물함 상태(고장 등) 변경 |
-| `PATCH` | `/v4/admin/cabinets/bundle/status` | **[NEW]** 사물함 상태/LentType 일괄 변경 (피시너 전용 구역 설정, 월말 일괄 반납). 대여 중인 사물함의 상태를 바꾸려면 `endActiveLents: true` 를 명시해야 하며, 없는 ID 또는 미명시 대여 중 사물함이 하나라도 있으면 아무것도 바꾸지 않고 전체 거부합니다(404/409, 문제 사물함 목록 포함). 응답에는 변경된 사물함과 종료된 대여/사용자 요약이 담깁니다. `reason`(작업 사유, 255자 이하)은 선택이지만 `endActiveLents: true`일 때는 필수이며, 감사 로그에 함께 남고, 성공한 작업은 변경 전/후 값이 `admin_action_log` / `admin_action_log_item` 테이블에 영구 기록됩니다. |
-| `GET` | `/v4/admin/action-logs` | 관리자 작업 감사 기록 목록(최신순, 페이지 크기 최대 100). 각 기록의 항목 수와, 이미 되돌려졌다면 `undoneByBatchId`를 담습니다. |
-| `GET` | `/v4/admin/action-logs/{batchId}` | 감사 기록 상세. 요청 원문과 대상별 변경 전/후 값을 담습니다. 없는 batchId는 404. |
-| `POST` | `/v4/admin/action-logs/{batchId}/undo` | 사물함 일괄 변경(`CABINET_BULK_STATUS_UPDATE`)을 되돌립니다. 본문 `{"reason": "..."}`은 필수(255자 이하)입니다. 로그의 변경 전 값으로 사물함 상태·LentType·메모를 복구하고 종료된 대여를 다시 엽니다. 그 사이 바뀐 것이 하나라도 있으면 아무것도 바꾸지 않고 전체 거부(409)하며 충돌을 한 번에 모두 알려 줍니다: `CABINET_CHANGED`, `LENT_CHANGED`, `CABINET_OCCUPIED`, `USER_HAS_ACTIVE_LENT`, `LENT_EXPIRED`(만료된 대여는 되살리지 않음), `RESERVED`, `USER_INACTIVE`, `ALREADY_UNDONE`. 한 작업은 한 번만 되돌릴 수 있고 Undo 기록은 다시 되돌릴 수 없습니다. Undo 자체도 감사 기록(`CABINET_BULK_STATUS_UNDO`)으로 남습니다. |
-| `POST` | `/v4/admin/cabinets/{visibleNum}/force-return` | 관리자 권한 강제 반납 |
-| `GET` | `/v4/admin/cabinets/pending` | 수동 반납 승인 대기 목록 조회 |
-| `GET` | `/v4/admin/returns/photos` | **[NEW]** 반납 완료된 사물함 사진 조회 (Audit) |
-| `POST` | `/v4/admin/cabinets/{visibleNum}/approve` | 수동 반납 최종 승인 (잠금 해제) |
-| `PATCH` | `/v4/admin/items/{itemName}/price` | 상점 아이템 가격 변경 |
-| `POST` | `/v4/admin/alarm/emergency` | 전체 유저 긴급 공지(DM) 발송 |
-| `GET` | `/v4/admin/cabinets/overdue` | 현재 연체 중인 유저 목록 조회 |
-| `GET` | `/v4/admin/cabinets/broken` | 고장 사물함 목록 조회 |
-| `GET` | `/v4/admin/cabinets/{visibleNum}` | 사물함 상세 정보 조회 |
-| `GET` | `/v4/admin/cabinets/{visibleNum}/history` | 사물함 대여 이력 조회 (페이징) |
-| `GET` | `/v4/admin/stats/weekly` | 주간 통계 요약 |
-| `GET` | `/v4/admin/stats/floors` | 층별 사물함 현황 통계 |
-| `GET` | `/v4/admin/stats/coins` | 주간 코인 흐름 통계 (지급/사용) |
-| `GET` | `/v4/admin/stats/items` | 아이템 사용 통계 + 출석/수박씨 집계 |
-| `GET` | `/v4/admin/stats/store` | 상점 판매 통계 |
-| `GET` | `/v4/admin/stats/attendance` | 기간별 출석 통계 조회 |
-| `POST` | `/v4/admin/calendar/events` | **[NEW]** 일정 등록 |
-| `PUT` | `/v4/admin/calendar/events/{id}` | **[NEW]** 일정 수정 |
-| `DELETE` | `/v4/admin/calendar/events/{id}` | **[NEW]** 일정 삭제 |
-| `GET` | `/v4/admin/banned-users` | **[NEW]** 블랙리스트 유저 목록 조회 |
-| `POST` | `/v4/admin/banned-users` | **[NEW]** 블랙리스트 유저 등록 (intraId로 차단) |
-| `DELETE` | `/v4/admin/banned-users/{intraId}` | **[NEW]** 블랙리스트 유저 해제 |
-
-> **블랙리스트 API:**
-> * **차단 방식:** `intraId` (42 로그인 이름)로 차단. 차단된 유저가 로그인 시도 시 OAuth 에러 발생.
-> * 요청 예시 (등록): `{ "intraId": "username", "reason": "차단 사유" }`
-
-<br>
-
-## ⚙️ Setup & Run
-
-### 1. 환경 설정 (Configuration)
-보안을 위해 실제 설정 파일은 저장소에 포함되지 않습니다. 아래 파일을 생성하여 환경 변수를 설정하세요.
-
-**A. `.env` 파일 생성 (Root Directory)**  
-프로젝트 루트 디렉토리에 `.env` 파일을 생성하고 아래 내용을 작성하세요.
-```properties
-# Database
-DB_ROOT_PASSWORD=root_password
-DB_USER=cabi
-DB_PASSWORD=cabi_password
-
-# Redis
-REDIS_PORT=6379
-
-# OAuth & Security
-FT_CLIENT_ID=your_42_client_id
-FT_CLIENT_SECRET=your_42_client_secret
-JWT_SECRET=your_jwt_strong_secret_key
-SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
-
-# Service URLs
-FRONTEND_URL=http://localhost
-AI_SERVER_URL=http://ai_server:8000
-COOKIE_SECURE=false
-CORS_ALLOWED_ORIGINS=http://localhost,http://localhost:3000
-
-# Timezone
-TZ=Asia/Seoul
-```
-
-> **Redis 연결은 안전하지 않으면 부팅하지 않습니다.** 비밀번호가 비어 있거나, 원격 호스트인데 TLS 가 꺼져 있으면 앱이 시작되지 않습니다(`RedisConfig` / `RedisConnectionPolicy`).
-> - `prod` 프로필은 `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` 를 읽고 TLS 를 켭니다.
-> - 다른 프로필 이름으로 띄운다면 `SPRING_DATA_REDIS_PASSWORD` 와 `SPRING_DATA_REDIS_SSL_ENABLED=true` 를 직접 주입하세요(`REDIS_PASSWORD` 는 prod 프로필에서만 읽힙니다).
-> - 로컬/테스트에서 비밀번호 없는 Redis 를 쓰려면 `REDIS_ALLOW_INSECURE=true` 를 **명시**해야 합니다. `prod` 프로필에서는 이 값을 켜도 부팅이 실패합니다. (`docker-compose.yaml` 의 로컬 스택은 이 값을 켜 둡니다.)
-
-**B. `src/main/resources/secret.properties` (Optional)**
-`.env`로 대체 가능하나, 로컬 실행 시 필요할 수 있습니다. `application.yml`의 환경 변수를 대체할 수 있도록 동일한 키를 포함해야 합니다.
-```properties
-# Database
-spring.datasource.username=cabi
-spring.datasource.password=cabi_password
-
-# Security & OAuth
-jwt.secret=your_jwt_strong_secret_key
-FT_CLIENT_ID=your_42_client_id
-FT_CLIENT_SECRET=your_42_client_secret
-SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
-
-# Service Config
-FRONTEND_URL=http://localhost
-AI_SERVER_URL=http://localhost:8000
-CORS_ALLOWED_ORIGINS=http://localhost,http://localhost:3000
-```
-
-### 2. 실행 (Docker Compose)
-모든 서비스(Nginx, Backend, DB, Monitoring)를 한 번에 실행합니다.
+# 42Cabi Gyeongsan
+
+## 1. 서비스 소개
+
+42 경산 캠퍼스의 사물함을 대여하고 반납하는 서비스의 백엔드(REST API 서버)다. 학생은 층별 사물함 목록에서 사용 가능한 사물함을 골라 31일 동안 빌릴 수 있고, 기간 안에 연장하거나 다른 사물함으로 옮길 수 있다.
+
+주요 기능은 다음과 같다.
+
+- 사물함 조회, 대여, 반납, 연장, 이사(다른 사물함으로 이동)
+- 이사할 사물함 예약. 예약은 15분 동안 유지되고, 사물함 목록과 상세 응답에 예약 여부가 표시된다.
+- 반납할 때 올린 사진을 AI 서버로 보내 사물함이 깨끗한지 검사
+- 출석과 월간 로그타임에 따른 코인, 대여권 지급과 상점
+- 관리자 기능: 사물함 상태 일괄 변경, 작업 기록 조회와 되돌리기
+- 슬랙 오류제보를 관리자 DM으로, 슬랙 공지를 카카오톡으로 전달
+- 자주 묻는 질문에 답하는 FAQ 챗봇 (기본값은 꺼짐)
+
+기술 스택은 다음과 같다.
+
+| 구분 | 사용 기술 |
+| --- | --- |
+| 언어, 프레임워크 | Java 17, Spring Boot 3.5.8 (Web, Data JPA, Security, OAuth2 Client, WebFlux) |
+| 데이터 | MariaDB, Flyway(스키마 마이그레이션), Redis(토큰, 분산 락, 스트림, 예약) |
+| 인증 | 42, 카카오, 구글 OAuth 로그인 후 JWT 발급 |
+| 안정성 | Resilience4j(서킷 브레이커, 호출 제한), ShedLock |
+| 문서, 모니터링 | springdoc(Swagger UI), Actuator, Prometheus, Grafana |
+| 실행 | Docker Compose, Nginx |
+| 외부 연동 | Slack, Azure Blob Storage, AI 청결도 검사 서버(Python FastAPI) |
+
+코드는 헥사고날 구조(`domain`, `application`, `adapter`)로 나뉘어 있고, 데이터베이스 마이그레이션은 `src/main/resources/db/migration`에 있다. 그 밖의 기술 문서는 `docs/`에 있다.
+
+## 2. 실행 환경 및 필요한 도구·버전
+
+| 도구 | 버전 | 비고 |
+| --- | --- | --- |
+| JDK | 17 | 빌드에 필요하다. Gradle 툴체인이 17을 요구한다. |
+| Gradle | 8.14.3 | 저장소의 `./gradlew`가 받아서 쓰므로 따로 설치하지 않는다. |
+| Spring Boot | 3.5.8 | |
+| Docker Engine | 29.6.2에서 확인 | |
+| Docker Compose | v2 이상 (5.3.1에서 확인) | `docker compose` 명령 |
+| MariaDB | 10.6 | compose가 컨테이너로 실행한다. |
+| Redis | `redis:alpine` (8.10.2에서 확인) | compose가 컨테이너로 실행한다. |
+| Nginx | `nginx:latest` (1.31.7에서 확인) | |
+| Prometheus, Grafana | `latest` 태그 (3.15.0, 13.2.4에서 확인) | |
+| AI 서버 | `ghcr.io/42-gy/ft_cabinet_ai` 이미지 | Python FastAPI. 이미지가 비공개라 접근 권한이 있어야 받을 수 있다. Python 버전은 이 저장소에서 확인할 수 없다. |
+| Python 3 | 선택 | `scripts/` 아래 보조 스크립트에만 필요하고 서비스 실행과는 무관하다. |
+
+`latest` 태그는 받는 시점에 따라 버전이 달라질 수 있다. 실행 중에는 호스트의 80, 3000, 13306, 6379 포트를 쓴다.
+
+JDK 17은 Ubuntu에서 `sudo apt install openjdk-17-jdk`로 설치할 수 있다.
+
+## 3. 설치 방법 및 실행 방법
+
+### Docker Compose로 실행
 
 ```bash
-# 1. 애플리케이션 빌드
+git clone https://github.com/farmer0010/ft_cabinet_BE-v2.git
+cd ft_cabinet_BE-v2
+cp .env.example .env
 ./gradlew clean build -x test
-
-# 2. 전체 인프라 실행 (Background)
-docker-compose up -d --build
+docker compose up -d --build --no-deps mariadb redis backend nginx prometheus grafana
 ```
 
-### 3. 접속 정보
-* **메인 서비스:** `http://localhost` (Port 80)
-* **Grafana:** `http://localhost:3000` (계정: admin / admin)
-* **Prometheus:** `http://localhost:9090`
+`.env.example`의 자리표시자 값 그대로도 서버는 뜬다. 다만 OAuth 로그인과 반납 사진 업로드는 실제 키가 있어야 동작한다. 백엔드는 처음 뜰 때 Flyway로 데이터베이스 스키마를 만든다.
 
-### 4. 테스트 계정 정보 (Test Accounts)
-`src/main/resources/data.sql` 은 더 이상 저장소에서 추적하지 않고 jar/이미지에도 포함되지 않습니다(실제 재학생 데이터가 들어 있어 제외, `.gitignore` 에 등록). 로컬/데모 스택의 초기 데이터는 **가짜 데이터만 담은** `scripts/db/seed/demo-seed.sql` 로 넣습니다.
+`ai` 서비스는 일부러 뺐다. AI 서버 이미지가 비공개라 받을 수 없으면 `docker compose up`이 이미지 pull에서 멈춘다. AI 서버 없이도 사물함 조회와 대여는 되고, 사진 검사를 하는 반납, 이사, 사진 확인 API만 실패한다. 이미지에 접근할 수 있다면 `docker compose up -d --build`로 전부 실행한다.
+
+백엔드가 뜨는 데 30초쯤 걸린다. 아래 명령으로 기동을 확인한다.
 
 ```bash
-# 스키마가 있어야 합니다(FLYWAY_ENABLED=true 로 앱을 띄우면 Flyway 가 만듭니다). 여러 번 실행해도 안전, 운영/공유 DB 에는 금지
-docker exec -i <mariadb 컨테이너> mysql -u<유저> -p<비밀번호> <DB> < scripts/db/seed/demo-seed.sql
+docker compose logs backend | grep "Started CabinetApplication"
 ```
-시드에는 `demo-admin`(ADMIN), 일반 유저 `demo-user-01/02`, 피시너 `demo-piscine-01` 과 사물함 90개가 들어 있습니다. 로그인은 실제 42 OAuth 로 하므로, 본인 인트라 ID 를 관리자로 쓰려면 DB 에서 직접 `role` 을 `ADMIN` 으로 바꾸세요.
 
-> **Tip:** 로그인 후 `/v4/admin/users/{your_intra_id}/coin` API를 통해 코인을 추가로 지급받아 상점 기능을 테스트해볼 수 있습니다.
+사물함 목록이 비어 있으므로 가짜 데이터로 된 시드를 넣는다. 사용자 이름과 비밀번호는 `.env`의 `DB_USER`, `DB_PASSWORD`와 같아야 한다.
 
-### 5. 주요 테스트 시나리오
-1. **대여/반납:** 메인 화면에서 사물함 선택 -> 대여 -> 내 정보 -> 반납 (사진 업로드)
-2. **자동 연장:** 상점에서 `연장권` 구매 -> `/v4/lent/extension/auto` API로 자동 연장 ON 설청 -> (DB에서 만료일 조작하여 테스트 close)
-3. **관리자 모드:** URL에 `/admin/login` 접근 -> (Admin 계정 필요) -> 대시보드 확인
+```bash
+docker exec -i cabi_db mariadb -uyour_db_user -pyour_db_password cabi < scripts/db/seed/demo-seed.sql
+```
+
+시드에는 2~4층 사물함 90개와 `demo-admin`(관리자), `demo-user-01`, `demo-user-02`, `demo-piscine-01` 사용자가 들어 있다. 이 사용자들로 로그인할 수는 없다.
+
+종료와 초기화는 다음과 같다.
+
+```bash
+docker compose down
+docker compose down -v && rm -rf db_data redis_data
+```
+
+### Gradle로 직접 실행
+
+데이터베이스와 Redis만 compose로 띄우고 애플리케이션은 호스트에서 실행한다.
+
+```bash
+cp .env.example .env
+docker compose up -d mariadb redis
+set -a; source .env; set +a
+DB_HOST=127.0.0.1 DB_PORT=13306 REDIS_ALLOW_INSECURE=true \
+SPRING_DATASOURCE_URL='jdbc:mariadb://127.0.0.1:13306/cabi?serverTimezone=Asia/Seoul&useUnicode=true&characterEncoding=UTF-8&useSSL=false' \
+SPRING_CLOUD_AZURE_STORAGE_BLOB_CONNECTION_STRING="$AZURE_STORAGE_CONNECTION_STRING" \
+./gradlew bootRun
+```
+
+로컬 MariaDB는 TLS가 꺼져 있어서 JDBC URL을 `useSSL=false`로 직접 지정한다. 이 경우 애플리케이션 주소는 `http://localhost:8080`이다.
+
+### 테스트
+
+```bash
+./gradlew clean test
+```
+
+일부 테스트는 Docker로 MariaDB, MySQL, Redis 컨테이너를 띄우므로 Docker가 실행 중이어야 한다. Docker가 없으면 해당 테스트는 건너뛴다.
+
+## 4. 환경 변수 설정 방법
+
+저장소 루트의 `.env.example`을 `.env`로 복사해서 값을 채운다. `.env`는 git에 올라가지 않는다. docker compose는 같은 디렉터리의 `.env`를 자동으로 읽는다.
+
+```bash
+cp .env.example .env
+```
+
+`.env.example`에서 줄 앞에 `#`이 붙은 변수는 선택이고, 적힌 값이 기본값이다. 아래 변수는 필수다.
+
+| 변수 | 설명 | 예시 형식 |
+| --- | --- | --- |
+| `DB_USER` | 데이터베이스 사용자 | `cabi` |
+| `DB_PASSWORD` | 데이터베이스 비밀번호 | 임의 문자열 |
+| `DB_ROOT_PASSWORD` | compose의 MariaDB root 비밀번호 | 임의 문자열 |
+| `FLYWAY_ENABLED` | 비어 있는 DB에 스키마를 만들려면 `true` | `true` |
+| `REDIS_PORT` | compose가 호스트에 여는 Redis 포트 | `6379` |
+| `JWT_SECRET` | JWT 서명 키. 32바이트 이상이어야 한다. | `openssl rand -base64 48` 결과 |
+| `FT_CLIENT_ID`, `FT_CLIENT_SECRET` | 42 OAuth 앱 | 42 intra에서 발급 |
+| `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET` | 카카오 OAuth 앱 | 카카오 디벨로퍼스에서 발급 |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 구글 OAuth 앱 | 구글 클라우드 콘솔에서 발급 |
+| `FRONTEND_URL` | OAuth 로그인 후 돌아올 주소. `https`이거나 localhost여야 하고 끝에 `/`를 붙이지 않는다. | `http://localhost` |
+| `SLACK_BOT_TOKEN` | 슬랙 봇 토큰 | `xoxb-...` |
+| `AZURE_STORAGE_CONNECTION_STRING` | 반납 사진을 올리는 Azure Blob Storage 연결 문자열. 값에 `;`가 있어 따옴표로 감싼다. | `"DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net"` |
+| `AI_MODEL_PATH` | AI 서버가 쓸 모델 파일 경로 (AI 서버 이미지 기준) | 이미지에 맞는 경로 |
+
+OAuth 앱의 redirect URI는 `{FRONTEND_URL}/login/oauth2/code/42`, `{FRONTEND_URL}/login/oauth2/code/kakao`, `{FRONTEND_URL}/login/oauth2/code/google`로 등록한다.
+
+슬랙 알림 전달, Gemini 공지 요약, FAQ 챗봇 같은 선택 기능은 모두 기본값이 꺼짐이다. 켜는 변수는 `.env.example`에 설명과 함께 들어 있다.
+
+## 5. 접속·확인 방법
+
+Docker Compose로 실행했을 때의 로컬 주소는 다음과 같다. 백엔드는 Nginx(80)를 거쳐 접근한다.
+
+| 대상 | 주소 |
+| --- | --- |
+| API 서버 | `http://localhost` |
+| Swagger UI | `http://localhost/swagger-ui/index.html` |
+| OpenAPI 문서 | `http://localhost/v3/api-docs` |
+| Grafana | `http://localhost:3000` (처음 로그인 계정은 `admin` / `admin`) |
+| MariaDB | `localhost:13306` |
+| Redis | `localhost:6379` |
+
+Prometheus는 compose 네트워크 안에서만 열려 있고 호스트 포트는 없다. Gradle로 직접 실행했다면 API 서버 주소는 `http://localhost:8080`이다.
+
+시드를 넣은 뒤 로그인 없이 확인할 수 있는 호출은 다음과 같다.
+
+```bash
+curl http://localhost/v4/cabinets/status-summary/all
+curl "http://localhost/v4/cabinets?floor=2"
+curl http://localhost/v4/cabinets/1
+```
+
+첫 호출은 `totalCounts`가 90인 JSON을 돌려주고, 두 번째는 2층 사물함 30개를 돌려준다. 사물함 응답에는 예약 여부(`isReserved`, `isReservedByMe`)가 들어 있다.
+
+`/actuator/health`는 관리자 권한이 필요해서 로그인하지 않으면 확인할 수 없다. Nginx도 `/actuator` 경로를 막아 둔다. 서버가 떠 있는지는 위 `curl` 호출이 200을 돌려주는지, `docker compose ps`에서 `cabi_backend`가 `Up`인지로 확인한다.
+
+로그인은 42, 카카오, 구글 OAuth로만 할 수 있다. 개발용 로그인이나 테스트 계정은 구현되어 있지 않다. 로컬에서 로그인하려면 각 서비스에서 OAuth 앱을 만들어 `.env`에 넣고 redirect URI를 위와 같이 등록한 뒤, 브라우저에서 `http://localhost/oauth2/authorization/42`(카카오는 `kakao`, 구글은 `google`)로 들어간다. 시드의 `demo-*` 사용자는 DB에만 있는 데이터이고, 본인 인트라 ID로 가입한 뒤 DB에서 `role`을 `ADMIN`으로 바꾸면 관리자 API를 쓸 수 있다.
+
+배포 주소: (제출 시 기재)

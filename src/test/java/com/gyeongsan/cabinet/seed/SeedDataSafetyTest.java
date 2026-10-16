@@ -16,13 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * 감사 H-5: 실제 재학생 인트라 ID 가 든 {@code src/main/resources/data.sql} 이 jar 와 공개 이미지에 실려 나갔다. 이 테스트는 (1)
- * 그 파일이 빌드 산출물(클래스패스)에 들어가지 않는지, (2) 테스트/데모용으로 새로 만든 시드에는 가짜 데이터만 있는지 확인한다.
- */
 class SeedDataSafetyTest {
 
-    /** 가짜 시드에 나와도 되는 작은따옴표 문자열: 가짜 이름·이메일과 열거형 값뿐이다. 그 밖의 값은 모두 실패시킨다(화이트리스트). */
     private static final Pattern FAKE_NAME_OR_EMAIL =
             Pattern.compile("(test|demo)-[a-z0-9-]+(@example\\.test)?");
 
@@ -35,7 +30,7 @@ class SeedDataSafetyTest {
         List<String> literals = new ArrayList<>();
         for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
             if (line.stripLeading().startsWith("--")) {
-                continue; // 주석은 값이 아니다
+                continue;
             }
             Matcher m = QUOTED.matcher(line);
             while (m.find()) {
@@ -63,12 +58,10 @@ class SeedDataSafetyTest {
                                                 "허용되지 않은 값 길이=%d 시작=%s",
                                                 literal.length(), prefix(literal))
                                         .isTrue());
-        // 이메일 형태의 값은 전부 example.test 도메인이다.
         assertThat(literals.stream().filter(l -> l.contains("@")))
                 .allSatisfy(email -> assertThat(email).endsWith("@example.test"));
     }
 
-    /** 실패 메시지에 값 전체를 싣지 않기 위해 앞 3글자만 보여 준다. */
     private static String prefix(String s) {
         return s.length() <= 3 ? s : s.substring(0, 3) + "…";
     }

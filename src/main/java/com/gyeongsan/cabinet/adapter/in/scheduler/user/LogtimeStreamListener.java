@@ -69,7 +69,6 @@ public class LogtimeStreamListener
         } catch (Exception e) {
             log.error("🚨 [Consumer] 로그타임 동기화 중 에러 발생 (ACK 처리 후 무시): {}", e.getMessage(), e);
             try {
-                // 예외 발생 시에도 Pending에 계속 남지 않도록 ACK 처리 (일종의 자동 버리기)
                 redisTemplate
                         .opsForStream()
                         .acknowledge(RedisStreamConfig.CONSUMER_GROUP_NAME, message);
@@ -80,10 +79,6 @@ public class LogtimeStreamListener
         }
     }
 
-    /**
-     * grade 는 로그인 때만 갱신되므로, 새 기준의 영향을 받는 사용자(트센 기준 이상, 일반 기준 미만의 비-트센)만 지급일에 다시 조회한다. 조회나 저장에 실패해도
-     * 지급 처리는 막지 않고, 저장된 값을 그대로 쓴다(트센으로 확인되지 않으면 일반 기준이라 대여권이 더 나가지는 않는다).
-     */
     private void refreshGradeIfNeeded(Long userId, String intraId, int totalMinutes) {
         try {
             if (!userUseCase.needsGradeRefresh(userId, totalMinutes)) {

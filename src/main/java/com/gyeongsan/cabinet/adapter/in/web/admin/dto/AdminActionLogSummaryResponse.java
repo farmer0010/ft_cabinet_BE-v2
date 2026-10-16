@@ -4,7 +4,6 @@ import com.gyeongsan.cabinet.domain.admin.model.AdminActionLogSummary;
 import com.gyeongsan.cabinet.domain.admin.model.AdminActionType;
 import java.time.LocalDateTime;
 
-/** 관리자 작업 기록 목록의 한 줄. undoneByBatchId 가 있으면 이미 되돌려진 작업이다. */
 public record AdminActionLogSummaryResponse(
         String batchId,
         AdminActionType actionType,

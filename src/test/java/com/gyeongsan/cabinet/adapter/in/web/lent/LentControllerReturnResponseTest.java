@@ -43,7 +43,6 @@ class LentControllerReturnResponseTest {
 
     @BeforeEach
     void setUp() {
-        // 실제 앱과 같은 Boot 기본 ObjectMapper 로 직렬화해서 시각이 ISO 문자열로 나가는지 본다.
         ObjectMapper[] holder = new ObjectMapper[1];
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(JacksonAutoConfiguration.class))

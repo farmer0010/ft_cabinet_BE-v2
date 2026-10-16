@@ -36,10 +36,6 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-/**
- * 컨트롤러 호출 로그에 사용자 입력(챗봇 질문, 반납 공유 비밀번호, 사유 등)이 남지 않는지 실제 컨트롤러를 AOP 프록시로 감싸 확인한다. 이전에는 인자를 그대로 찍어 이런
- * 값이 콘솔과 30일 보관 파일 로그에 남았다.
- */
 class LoggingAspectTest {
 
     private static final String SECRET_QUESTION = "SECRET-QUESTION-내 패널티 언제 풀려요 홍길동";
@@ -113,7 +109,6 @@ class LoggingAspectTest {
         try {
             controller.endLentCabinet(file, SECRET_PASSWORD, false, SECRET_REASON, principal);
         } catch (RuntimeException ignored) {
-            // 응답 조립 중 목 객체 때문에 실패해도, 요청 로그는 이미 남은 뒤다.
         }
 
         String logs = allLogs();
@@ -123,7 +118,6 @@ class LoggingAspectTest {
                 .doesNotContain("SECRET-REASON")
                 .doesNotContain("cabinet.jpg")
                 .doesNotContain("PHOTO-BYTES");
-        // 값은 가렸지만 어떤 타입의 인자가 들어왔는지는 디버깅에 남는다.
         assertThat(logs).contains("MockMultipartFile").contains("false");
     }
 

@@ -46,7 +46,7 @@ class PerUserRateLimiterTest {
         advanceMillis(30_000);
         assertThat(limiter.tryAcquire(1)).isTrue();
         assertThat(limiter.tryAcquire(1)).isFalse();
-        advanceMillis(30_000); // 첫 요청이 창 밖으로 나감
+        advanceMillis(30_000);
         assertThat(limiter.tryAcquire(1)).isTrue();
         assertThat(limiter.tryAcquire(1)).isFalse();
     }
@@ -58,7 +58,7 @@ class PerUserRateLimiterTest {
         assertThat(limiter.tryAcquire(1)).isTrue();
         advanceMillis(59_000);
         assertThat(limiter.tryAcquire(1)).isFalse();
-        advanceMillis(1_000); // 첫 요청으로부터 60초
+        advanceMillis(1_000);
         assertThat(limiter.tryAcquire(1)).isTrue();
     }
 
@@ -71,7 +71,6 @@ class PerUserRateLimiterTest {
         }
         assertThat(limiter.trackedUsers()).isGreaterThan(1000);
         advanceMillis(120_000);
-        // 정리는 호출 1024번마다 한 번 일어난다
         for (int i = 0; i < 1100; i++) {
             limiter.tryAcquire(100_000L);
         }

@@ -56,7 +56,6 @@ def make_model(out: Path, name: str, emb: np.ndarray, kind: str) -> Path:
     inits = [numpy_helper.from_array(emb, "emb")]
     last = "hidden"
 
-    # attention_mask 가 실제로 결과에 쓰이도록: 마스크된(=1) 토큰마다 0.25 를 더한다.
     inits.append(numpy_helper.from_array(np.array([0.25], dtype=np.float32), "quarter"))
     inits.append(numpy_helper.from_array(np.array([2], dtype=np.int64), "axes_last"))
     nodes += [

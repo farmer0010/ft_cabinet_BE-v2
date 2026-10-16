@@ -17,7 +17,6 @@ import org.springframework.core.env.EnumerablePropertySource;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.FileSystemResource;
 
-/** yml 에 정의한 RateLimiter 와 코드의 @RateLimiter 이름이 서로 어긋나지 않는지 확인한다(설정만 있고 안 쓰이는 한도 방지). */
 class RateLimiterConfigConsistencyTest {
 
     private static final Path MAIN_YML = Path.of("src/main/resources/application.yml");

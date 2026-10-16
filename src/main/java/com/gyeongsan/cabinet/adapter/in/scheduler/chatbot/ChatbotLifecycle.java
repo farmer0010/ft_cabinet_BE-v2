@@ -16,10 +16,6 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/**
- * 서버가 뜨면 초기 FAQ 를 넣고(테이블이 비어 있을 때만) 검색 색인을 만든다. 이후 주기적으로 DB 의 FAQ 가 바뀌었는지 확인해 이 서버의 색인을 갱신한다. 색인은
- * 서버마다 따로 갖기 때문에 ShedLock 을 쓰지 않는다.
- */
 @Component
 @ConditionalOnProperty(name = "app.chatbot.enabled", havingValue = "true")
 @RequiredArgsConstructor

@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** FAQ 관리(관리자 전용: /v4/admin/** 는 ROLE_ADMIN 이 필요하다). 저장하면 챗봇 검색 색인이 자동으로 다시 만들어진다. */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/v4/admin/faqs")

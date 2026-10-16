@@ -27,7 +27,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/** 월간 로그타임 보상: 트센 15시간 / 일반 80시간 기준, 같은 달 중복 지급 방지. */
 class UserDomainServiceRewardTest {
 
     private static final Long USER_ID = 9L;
@@ -184,7 +183,6 @@ class UserDomainServiceRewardTest {
         assertThat(user.getFtGrade()).isEqualTo("Transcender");
         assertThat(user.isTranscender()).isTrue();
 
-        // 본과정 항목이 없어진 경우(null)는 정상 해석 결과이므로 null 로 갱신한다.
         service.updateFtGrade(USER_ID, FtGradeSnapshot.of(null));
         assertThat(user.getFtGrade()).isNull();
     }

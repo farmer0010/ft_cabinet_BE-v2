@@ -30,19 +30,6 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * V5·V6 마이그레이션 리허설(운영 이행 전 검증). 코드/스키마를 바꾸는 테스트가 아니라, 운영 이행 때 일어날 수 있는 일을 실제 DB 에서 미리 돌려 본다.
- *
- * <ol>
- *   <li>운영 경로: V1 스키마가 이미 있는 DB 에 baseline(1)만 찍고 V2~V6 만 올라가는지, 데이터가 보존되는지, 엔티티가 validate 를 통과하는지.
- *   <li>중간 실패: V5·V6 는 DDL 이 여러 문장이고 MySQL/MariaDB 의 DDL 은 롤백되지 않는다. 중간에 실패하면 무엇이 반쯤 남는지, Flyway 가
- *       어떤 상태가 되는지, 복구 절차가 실제로 통하는지.
- *   <li>잠금: user 테이블 ALTER(V4, V6)가 큰 테이블에서도 메타데이터만 바꾸는지(ALGORITHM=INSTANT), 그리고 열린 트랜잭션이 있을 때
- *       ALTER 가 어떻게 막히는지(메타데이터 락).
- * </ol>
- *
- * 관찰 결과는 {@code build/migration-rehearsal.txt} 에도 남긴다. Docker 가 없으면 건너뛴다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class MigrationRehearsalMysqlTest {
 
@@ -62,7 +49,6 @@ class MigrationRehearsalMysqlTest {
                     StandardOpenOption.CREATE,
                     StandardOpenOption.APPEND);
         } catch (Exception ignored) {
-            // 보고용 부가 기록이다.
         }
     }
 
@@ -183,7 +169,6 @@ class MigrationRehearsalMysqlTest {
                     .containsExactly(
                             "1:BASELINE:1", "2:SQL:1", "3:SQL:1", "4:SQL:1", "5:SQL:1", "6:SQL:1");
             assertThat(count(db, "SELECT COUNT(*) FROM `user`")).isEqualTo(1);
-            // 기존 사용자의 새 컬럼 값: kakao_alarm 은 꺼짐(0), ft_grade 는 NULL(일반 취급).
             assertThat(count(db, "SELECT kakao_alarm FROM `user`")).isZero();
             assertThat(count(db, "SELECT COUNT(*) FROM `user` WHERE ft_grade IS NULL"))
                     .isEqualTo(1);
@@ -201,7 +186,6 @@ class MigrationRehearsalMysqlTest {
         try (MariaDbDriverMySqlContainer db = new MariaDbDriverMySqlContainer(image)) {
             db.start();
             BaselinedSchema.prepare(db);
-            // 누군가 같은 이름의 테이블을 먼저 만들어 둔 상황 → V5 의 첫 CREATE(faq)는 성공하고 둘째(faq_question)가 실패한다.
             exec(db, "CREATE TABLE faq_question (x INT)");
 
             Flyway flyway = flyway(db);
@@ -223,22 +207,19 @@ class MigrationRehearsalMysqlTest {
                     .containsExactly("5:SQL:0");
             assertThat(columnExists(db, "user", "kakao_alarm")).isFalse();
 
-            // 그대로 다시 migrate 하면 '실패한 마이그레이션이 있다'며 거부한다.
             assertThatThrownBy(flyway::migrate)
                     .isInstanceOf(FlywayException.class)
                     .hasMessageContaining("failed migration");
 
-            // repair 만 하고 반쯤 남은 faq 를 안 치우면 같은 곳에서 또 실패한다(CREATE TABLE faq 가 이미 있음).
             flyway.repair();
             assertThatThrownBy(flyway::migrate).isInstanceOf(FlywayException.class);
             note(image + " repair 만 하고 재시도: 다시 실패(반쯤 남은 faq 때문)");
 
-            // 올바른 복구: 반쯤 남은 것과 충돌 원인을 치우고, 실패 기록을 repair 로 지운 뒤 migrate.
             exec(db, "DROP TABLE IF EXISTS faq_question", "DROP TABLE IF EXISTS faq");
             flyway.repair();
             MigrateResult retry = flyway.migrate();
 
-            assertThat(retry.migrationsExecuted).isEqualTo(2); // V5, V6
+            assertThat(retry.migrationsExecuted).isEqualTo(2);
             assertThat(history(db))
                     .containsExactly(
                             "1:BASELINE:1", "2:SQL:1", "3:SQL:1", "4:SQL:1", "5:SQL:1", "6:SQL:1");
@@ -256,7 +237,6 @@ class MigrationRehearsalMysqlTest {
         try (MariaDbDriverMySqlContainer db = new MariaDbDriverMySqlContainer(image)) {
             db.start();
             BaselinedSchema.prepare(db);
-            // V6 는 ALTER(컬럼 추가) → CREATE TABLE 순서다. 같은 이름의 테이블이 있으면 컬럼은 추가된 채로 둘째에서 실패한다.
             exec(db, "CREATE TABLE kakao_notify_consent (x INT)");
 
             Flyway flyway = flyway(db);
@@ -277,7 +257,7 @@ class MigrationRehearsalMysqlTest {
             flyway.repair();
             assertThatThrownBy(flyway::migrate)
                     .isInstanceOf(FlywayException.class)
-                    .hasMessageContaining("kakao_alarm"); // Duplicate column name
+                    .hasMessageContaining("kakao_alarm");
             note(image + " repair 만 하고 재시도: 다시 실패(Duplicate column kakao_alarm)");
 
             exec(
@@ -302,7 +282,6 @@ class MigrationRehearsalMysqlTest {
         try (MariaDbDriverMySqlContainer db = new MariaDbDriverMySqlContainer(image)) {
             db.start();
             BaselinedSchema.createExistingTables(db);
-            // 운영 규모(수천 행)보다 훨씬 큰 20만 행을 넣어, 재구성이 일어난다면 눈에 띄게 한다.
             try (Connection c = connect(db);
                     Statement s = c.createStatement()) {
                 s.execute("INSERT INTO `user` (name, is_pisciner) VALUES ('seed', b'0')");
@@ -358,16 +337,15 @@ class MigrationRehearsalMysqlTest {
             try (Connection longTx = connect(db);
                     Statement tx = longTx.createStatement()) {
                 longTx.setAutoCommit(false);
-                tx.executeQuery("SELECT COUNT(*) FROM `user`").close(); // 트랜잭션이 user 의 메타데이터 락을 쥔다.
+                tx.executeQuery("SELECT COUNT(*) FROM `user`").close();
 
-                // Flyway 세션에 lock_wait_timeout 을 줘서 무한정 기다리지 않게 한다(initSql).
                 Flyway guarded = flyway(db, "SET SESSION lock_wait_timeout = 3");
                 var readerWait = new long[1];
                 Thread reader =
                         new Thread(
                                 () -> {
                                     try {
-                                        Thread.sleep(1_000); // ALTER 가 줄을 선 뒤에 읽기를 시도한다.
+                                        Thread.sleep(1_000);
                                         long start = System.nanoTime();
                                         try (Connection c = connect(db);
                                                 Statement s = c.createStatement()) {
@@ -399,7 +377,6 @@ class MigrationRehearsalMysqlTest {
                         .isGreaterThanOrEqualTo(1_000);
             }
 
-            // 트랜잭션이 끝나면(커밋/롤백) 같은 migrate 가 정상 적용된다.
             Flyway flyway = flyway(db);
             flyway.repair();
             flyway.migrate();

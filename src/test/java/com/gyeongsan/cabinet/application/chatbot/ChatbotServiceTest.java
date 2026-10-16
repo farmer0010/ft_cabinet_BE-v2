@@ -41,7 +41,6 @@ class ChatbotServiceTest {
         manager = new FaqIndexManager(repository, embedding);
         service = new ChatbotService(manager, embedding, metrics, SETTINGS);
 
-        // FAQ 1(대여)은 x 축, FAQ 2(반납)는 y 축, FAQ 3(연장)은 z 축 방향.
         repository.save(
                 new Faq(null, null, "대여", "대여 답변", true, List.of("대여 방법", "대여 어떻게"), null, null));
         repository.save(new Faq(null, null, "반납", "반납 답변", true, List.of("반납 방법"), null, null));
@@ -61,7 +60,7 @@ class ChatbotServiceTest {
     @DisplayName("유사도가 임계값 이상이면 그 FAQ 의 답변을 그대로 돌려준다")
     void matched() {
         ready();
-        embedding.on("사물함 빌리려면?", 0.95, 0.31, 0); // 대여 방법과 약 0.95
+        embedding.on("사물함 빌리려면?", 0.95, 0.31, 0);
 
         ChatbotAnswer answer = service.ask("사물함 빌리려면?");
 
@@ -75,7 +74,6 @@ class ChatbotServiceTest {
     @DisplayName("임계값에는 못 미치지만 비슷한 구간이면 후보 질문들을 돌려준다 (답변은 주지 않는다)")
     void suggested() {
         ready();
-        // 대여 방향과 약 0.70, 반납 방향과 약 0.70 -> 후보 2개
         embedding.on("애매한 질문", 0.7, 0.7, 0.1);
 
         ChatbotAnswer answer = service.ask("애매한 질문");
@@ -104,11 +102,11 @@ class ChatbotServiceTest {
     @DisplayName("임계값 경계: 정확히 임계값이면 찾은 것이고, 그보다 조금 낮으면 후보다")
     void thresholdBoundary() {
         ready();
-        embedding.on("경계 질문", 0.8, 0, 0.6); // 대여 방법과 정확히 0.8 (다른 표현과는 약 0.795)
+        embedding.on("경계 질문", 0.8, 0, 0.6);
 
         assertThat(service.ask("경계 질문").result()).isEqualTo(Result.MATCHED);
 
-        embedding.on("경계 아래", 0.79, 0, 0.6131); // 대여 방법과 0.79, 연장과 0.61
+        embedding.on("경계 아래", 0.79, 0, 0.6131);
         assertThat(service.ask("경계 아래").result()).isEqualTo(Result.SUGGESTED);
     }
 
@@ -237,7 +235,6 @@ class ChatbotServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ChatbotSettings(0.8, 0.6, 3, 200, 2, " "))
                 .isInstanceOf(IllegalArgumentException.class);
-        // 같은 값은 허용(후보 구간 없음)
         assertThat(new ChatbotSettings(0.8, 0.8, 3, 200, 2, "m").suggestThreshold()).isEqualTo(0.8);
     }
 
