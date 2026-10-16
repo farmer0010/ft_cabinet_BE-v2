@@ -50,6 +50,18 @@ JDK 17은 Ubuntu에서 `sudo apt install openjdk-17-jdk`로 설치할 수 있다
 
 ## 3. 설치 방법 및 실행 방법
 
+### make로 실행
+
+`make`가 있으면 아래 세 줄로 끝난다. `make up`은 `.env`가 없으면 `.env.example`을 복사하고, jar를 빌드한 뒤 `ai`를 뺀 컨테이너를 띄우고 백엔드가 뜰 때까지 기다린다.
+
+```bash
+make up
+make seed
+make check
+```
+
+`make help`로 대상 목록을 볼 수 있다. 종료는 `make down`, 데이터까지 지우려면 `make reset`, 컨테이너 없이 호스트에서 실행하려면 `make run`, 테스트는 `make test`다. `make`가 없는 환경에서는 아래 명령을 직접 실행한다.
+
 ### Docker Compose로 실행
 
 ```bash
