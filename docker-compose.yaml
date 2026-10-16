@@ -82,6 +82,8 @@ services:
     environment:
       - DB_HOST=mariadb
       - DB_PORT=3306
+      - SPRING_DATASOURCE_URL=jdbc:mariadb://mariadb:3306/cabi?serverTimezone=Asia/Seoul&useUnicode=true&characterEncoding=UTF-8&useSSL=false
+      - FLYWAY_ENABLED=${FLYWAY_ENABLED:-false}
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - REDIS_HOST=redis
@@ -98,9 +100,15 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING}
+      - SPRING_CLOUD_AZURE_STORAGE_BLOB_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING}
       - AI_SERVER_URL=${AI_SERVER_URL:-http://ai:8000}
       - COOKIE_SECURE=${COOKIE_SECURE}
       - TZ=Asia/Seoul
+    networks:
+      default:
+        aliases:
+          - cabi_backend_blue
+          - cabi_backend_green
     depends_on:
       - mariadb
       - redis
