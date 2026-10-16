@@ -29,7 +29,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
-/** 긴 공지 요약이 서비스에 끼어드는 방식(호출 조건, 1회 호출·재사용, 폴백, 안전 장치)을 확인한다. 요약기는 가짜다. */
 class SlackNoticeSummaryTest {
 
     private static final String CHANNEL = "C0NOTICE";

@@ -52,17 +52,11 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * 사물함 일괄 변경(bulk)을 실제로 실행한 뒤 Undo 로 되돌리는 전체 흐름을 실제 MySQL 에서 확인한다. 실제 JPA 저장소와 트랜잭션, DB 가 마이크로초 아래를
- * 잘라내는 시각 저장까지 거치므로 목(mock)으로는 확인할 수 없는 부분(로그의 시각과 DB 값의 일치, 락 쿼리, 로그 JSON 왕복)을 검증한다. Docker 가 없으면
- * 건너뛴다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class AdminBulkUndoRoundTripMysqlTest {
 
     private static final AdminActor ADMIN = new AdminActor(1L, "admin01");
 
-    /** Redis 대신 쓰는 메모리 예약 저장소. */
     static class FakeReservationPort implements ReservationPort {
         final Map<Integer, Long> reservations = new HashMap<>();
 
@@ -158,8 +152,6 @@ class AdminBulkUndoRoundTripMysqlTest {
                         "spring.datasource.username=" + mysql.getUsername(),
                         "spring.datasource.password=" + mysql.getPassword(),
                         "spring.datasource.driver-class-name=org.mariadb.jdbc.Driver",
-                        // 이 테스트는 도메인 흐름이 대상이라 모든 테이블을 Hibernate 가 만든다.
-                        // 감사 로그 테이블 정의(Flyway)와 엔티티의 일치는 별도 테스트가 검증한다.
                         "spring.jpa.hibernate.ddl-auto=create",
                         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MariaDBDialect");
     }
@@ -193,7 +185,6 @@ class AdminBulkUndoRoundTripMysqlTest {
                                         context.getBean(FakeReservationPort.class);
                                 LocalDateTime now = LocalDateTime.now();
 
-                                // ---------- A) 왕복: 되돌리면 원래 상태와 같다 ----------
                                 User u1 = users.save(user("intra01"));
                                 Cabinet c1 = cabinets.save(cabinet(101, CabinetStatus.FULL));
                                 Cabinet c2 = cabinets.save(cabinet(102, CabinetStatus.AVAILABLE));
@@ -232,7 +223,6 @@ class AdminBulkUndoRoundTripMysqlTest {
                                 assertThat(undone.reopenedLents()).hasSize(1);
                                 assertThat(undone.restoredCabinets()).hasSize(2);
 
-                                // Undo 자체도 감사 기록에 남고, 원본은 되돌려진 것으로 표시된다.
                                 assertThat(logs.findUndoBatchIdOf(bulkResult.batchId()))
                                         .contains(undone.undoBatchId());
                                 AdminActionLog undoLog =
@@ -240,7 +230,6 @@ class AdminBulkUndoRoundTripMysqlTest {
                                 assertThat(undoLog.undoOfBatchId()).isEqualTo(bulkResult.batchId());
                                 assertThat(undoLog.reason()).isEqualTo("실수로 일괄 반납함");
 
-                                // 같은 작업을 두 번 되돌릴 수 없다.
                                 UndoRejection twice =
                                         rejectionOf(
                                                 () ->
@@ -250,7 +239,6 @@ class AdminBulkUndoRoundTripMysqlTest {
                                                                 ADMIN));
                                 assertThat(twice.undoneByBatchId()).isEqualTo(undone.undoBatchId());
 
-                                // ---------- B) 유저가 그 사이 다른 사물함을 빌림 → 전체 거부 ----------
                                 User u2 = users.save(user("intra02"));
                                 Cabinet c3 = cabinets.save(cabinet(103, CabinetStatus.FULL));
                                 Cabinet c4 = cabinets.save(cabinet(104, CabinetStatus.AVAILABLE));
@@ -280,14 +268,12 @@ class AdminBulkUndoRoundTripMysqlTest {
                                 assertThat(rejectedB.conflicts())
                                         .extracting(UndoRejection.Conflict::code)
                                         .containsExactly(UndoConflictCode.USER_HAS_ACTIVE_LENT);
-                                // 거부된 Undo 는 아무것도 바꾸지 않았다.
                                 assertThat(lents.findById(l2.getId()).orElseThrow().getEndedAt())
                                         .isNotNull();
                                 assertThat(cabinets.findById(c3.getId()).orElseThrow().getStatus())
                                         .isEqualTo(CabinetStatus.PENDING);
                                 assertThat(logs.findUndoBatchIdOf(bulkB.batchId())).isEmpty();
 
-                                // ---------- C) 만료된 대여 → 거부 ----------
                                 User u3 = users.save(user("intra03"));
                                 Cabinet c5 = cabinets.save(cabinet(105, CabinetStatus.FULL));
                                 lents.save(
@@ -308,7 +294,6 @@ class AdminBulkUndoRoundTripMysqlTest {
                                         .extracting(UndoRejection.Conflict::code)
                                         .containsExactly(UndoConflictCode.LENT_EXPIRED);
 
-                                // ---------- D) 예약이 걸리면 거부, 풀리면 다시 되돌릴 수 있다 ----------
                                 User u4 = users.save(user("intra04"));
                                 Cabinet c6 = cabinets.save(cabinet(106, CabinetStatus.FULL));
                                 LentHistory l4 =

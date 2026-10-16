@@ -16,12 +16,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * 카카오 talk_message 동의. 유저당 한 행(user_id UNIQUE)이다. 로그인용 OauthLink 와 일부러 분리했다.
- *
- * <p>refresh_token 은 암호화된 값만 들고 있다(평문은 이 객체에 닿지 않는다). 동의가 해지되면 {@code revokedAt} 이 채워지고, 다시 동의하면 같은
- * 행을 되살린다.
- */
 @Entity
 @Table(
         name = "KAKAO_NOTIFY_CONSENT",
@@ -68,11 +62,6 @@ public class KakaoNotifyConsent {
         return revokedAt == null;
     }
 
-    /**
-     * 동의를 새로 받았다. 해지된 상태였다면 되살리고(동의 시각 갱신), 이미 유효했다면 토큰과 범위만 바꾼다.
-     *
-     * @return 이번 호출로 해지 → 유효가 되었으면 true(첫 동의가 아니라 "되살림")
-     */
     public boolean renew(String encryptedRefreshToken, String scope, LocalDateTime now) {
         boolean reactivated = revokedAt != null;
         this.encryptedRefreshToken = encryptedRefreshToken;

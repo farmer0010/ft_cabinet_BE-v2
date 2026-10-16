@@ -45,7 +45,6 @@ import org.junit.jupiter.api.Test;
 class PersonalChatbotServiceTest {
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
-    // 2026-10-07(수) 14:00
     private static final Clock CLOCK =
             Clock.fixed(LocalDateTime.of(2026, 10, 7, 14, 0).atZone(ZONE).toInstant(), ZONE);
 

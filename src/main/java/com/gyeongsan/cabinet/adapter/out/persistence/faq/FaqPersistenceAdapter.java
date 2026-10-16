@@ -41,7 +41,6 @@ public class FaqPersistenceAdapter implements FaqRepositoryPort {
     @Override
     @Transactional
     public Faq save(Faq faq) {
-        // DATETIME(6) 은 마이크로초라 같은 정밀도로 맞춘다.
         LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
 
         FaqEntity entity;

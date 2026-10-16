@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
-/** 사물함 예약 조회의 값 변환을 Redis 없이 확인한다. 실제 Redis 에서의 동작은 {@link ReservationRedisAdapterTest} 가 본다. */
 class ReservationRedisAdapterQueryTest {
 
     private StringRedisTemplate template;

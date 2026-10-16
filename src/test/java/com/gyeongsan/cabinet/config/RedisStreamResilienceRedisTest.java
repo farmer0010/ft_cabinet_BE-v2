@@ -28,10 +28,6 @@ import org.springframework.data.redis.stream.StreamMessageListenerContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * 감사 H-7: Redis Streams 구독이 첫 오류에 영구히 취소되고, 재시작 전에 수령만 하고 처리하지 못한 메시지는 아무도 다시 읽지 않는다. 실제 Redis 와 실제
- * {@link RedisStreamConfig} 로 확인한다. Docker 가 없으면 건너뛴다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class RedisStreamResilienceRedisTest {
 
@@ -75,13 +71,10 @@ class RedisStreamResilienceRedisTest {
         if (container != null) {
             container.stop();
             container = null;
-            // 구독 스레드가 마지막 폴링/오류 처리(최대 대기 1초 + 쉬는 시간 2초)를 끝내고 빠질 때까지 기다린다. 남은 스레드가 다음 테스트의
-            // Redis 상태(그룹 재생성 등)를 건드리지 않게 하려는 격리용이다.
             Thread.sleep(3_500);
         }
     }
 
-    /** 운영 리스너처럼 처리 뒤 스스로 ACK 하고 삭제한다. */
     private StreamListener<String, MapRecord<String, String, String>> recording() {
         return message -> {
             received.add(message.getValue().get("n"));
@@ -107,7 +100,6 @@ class RedisStreamResilienceRedisTest {
     private void startContainer(StreamListener<String, MapRecord<String, String, String>> slack) {
         RedisStreamConfig config = new RedisStreamConfig(factory, template);
         container = config.streamMessageListenerContainer(slack, message -> {});
-        // 테스트에서는 방치 기준을 짧게 한다(운영 기본값 60초).
         reclaimer =
                 config.streamPendingReclaimer(
                         slack,
@@ -151,11 +143,9 @@ class RedisStreamResilienceRedisTest {
         send("1");
         assertThat(waitFor(() -> received.contains("1"), 5_000)).isTrue();
 
-        // 스트림이 사라지면(flush, 장애 복구 등) 다음 읽기가 NOGROUP 오류로 실패한다.
         template.delete(RedisStreamConfig.SLACK_STREAM_KEY);
-        Thread.sleep(2_500); // 폴링이 오류를 만나도록 둔다.
+        Thread.sleep(2_500);
 
-        // 운영자/재기동이 스트림과 그룹을 되살렸다고 가정한다.
         template.opsForStream()
                 .add(RedisStreamConfig.SLACK_STREAM_KEY, Collections.singletonMap("init", "init"));
         createGroupQuietly();
@@ -174,7 +164,7 @@ class RedisStreamResilienceRedisTest {
         assertThat(waitFor(() -> received.contains("1"), 5_000)).isTrue();
 
         template.delete(RedisStreamConfig.SLACK_STREAM_KEY);
-        send("2"); // XADD 가 스트림을 새로 만들지만 그룹은 없다.
+        send("2");
 
         assertThat(waitFor(() -> received.contains("2"), 15_000))
                 .as("그룹이 복구되고 그 사이 쌓인 메시지도 전달돼야 한다 (받은 것: %s)", received)
@@ -184,7 +174,6 @@ class RedisStreamResilienceRedisTest {
     @Test
     @DisplayName("이전 프로세스가 수령만 하고 ACK 하지 못한 메시지는 재시작한 소비자가 다시 처리한다")
     void pendingMessageOfDeadConsumerIsReprocessed() throws Exception {
-        // 이전 프로세스: 그룹을 만들고 메시지를 수령(XREADGROUP)했지만 처리/ACK 전에 죽었다.
         template.opsForStream()
                 .add(RedisStreamConfig.SLACK_STREAM_KEY, Collections.singletonMap("init", "init"));
         createGroupQuietly();
@@ -202,7 +191,6 @@ class RedisStreamResilienceRedisTest {
         Map<String, Long> pending = pendingByConsumer();
         assertThat(pending).containsEntry("dead-consumer", 1L);
 
-        // 새 프로세스가 뜬다(소비자 이름이 새로 만들어진다).
         startContainer();
 
         assertThat(waitFor(() -> received.contains("crashed"), 8_000))
@@ -292,7 +280,6 @@ class RedisStreamResilienceRedisTest {
                                 RedisStreamConfig.SLACK_STREAM_KEY, ReadOffset.lastConsumed()));
     }
 
-    /** 구독이 스스로 그룹을 되살렸을 수도 있으므로, 이미 있으면(BUSYGROUP) 넘어간다. */
     private static void createGroupQuietly() {
         try {
             template.opsForStream()

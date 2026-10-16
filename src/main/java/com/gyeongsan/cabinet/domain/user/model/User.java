@@ -69,7 +69,6 @@ public class User {
     @Column(name = "PUSH_ALARM")
     private boolean pushAlarm = false;
 
-    /** 슬랙 공지를 카카오톡으로 받을지. 카카오 talk_message 동의가 유효해야 실제로 발송된다. 첫 동의 때 켜진다. */
     @Builder.Default
     @Column(name = "KAKAO_ALARM", nullable = false)
     @ColumnDefault("false")
@@ -79,7 +78,6 @@ public class User {
     @Column(name = "IS_PISCINER", nullable = false)
     private boolean isPisciner = false;
 
-    /** 42 API 본과정(cursus 21)의 grade 원문. 판정은 {@link #isTranscender()} 로 한다. */
     @Column(name = "FT_GRADE", length = 32)
     private String ftGrade;
 
@@ -183,7 +181,6 @@ public class User {
         this.ftGrade = ftGrade;
     }
 
-    /** 본과정 grade 가 정확히 "Transcender" 인 경우만 트센이다. 그 외(Cadet, 미확인 값, null)는 일반 사용자다. */
     public boolean isTranscender() {
         return FtGradeResolver.TRANSCENDER.equals(this.ftGrade);
     }

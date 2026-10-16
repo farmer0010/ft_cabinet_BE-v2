@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
 
-/** src/test/resources/fixtures/ft 의 42 API 응답 픽스처를 읽는다. */
 public final class FtFixtures {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -28,7 +27,6 @@ public final class FtFixtures {
         }
     }
 
-    /** /v2/me 처럼 Spring Security 가 Map 으로 들고 있는 형태. */
     public static Map<String, Object> asAttributes(String name) {
         try {
             return MAPPER.readValue(raw(name), new TypeReference<>() {});
@@ -37,7 +35,6 @@ public final class FtFixtures {
         }
     }
 
-    /** WebClient 가 읽는 JsonNode 형태. */
     public static JsonNode asJson(String name) {
         try {
             return MAPPER.readTree(raw(name));

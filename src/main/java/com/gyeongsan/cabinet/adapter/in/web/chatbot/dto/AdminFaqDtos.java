@@ -8,7 +8,6 @@ public final class AdminFaqDtos {
 
     private AdminFaqDtos() {}
 
-    /** 모든 검증(길이, 개수, 공백)은 서비스가 한다. enabled 를 생략하면 true 로 본다. */
     public record FaqRequest(
             String category, String answer, Boolean enabled, List<String> questions) {
 

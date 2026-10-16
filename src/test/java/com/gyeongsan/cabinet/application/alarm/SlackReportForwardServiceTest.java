@@ -26,7 +26,6 @@ class SlackReportForwardServiceTest {
 
     private static final String CHANNEL = "C0REPORT";
 
-    /** 채널 안의 메시지를 들고 있다가 커서보다 새로운 것만 돌려주는 가짜 슬랙. */
     static class FakeChannel implements SlackChannelPort {
         final List<SlackChannelMessage> messages = new ArrayList<>();
         boolean failFetch;
@@ -159,10 +158,9 @@ class SlackReportForwardServiceTest {
         assertThat(alarm.sent).isEmpty();
         assertThat(cursor.store).containsEntry(CHANNEL, "1700000200.000100");
 
-        // 이후 새 글만 전달된다.
         channel.messages.add(msg("1700000300.000100", "새 글"));
         service.forwardNewReports();
-        assertThat(alarm.sent).hasSize(2); // 관리자 2명
+        assertThat(alarm.sent).hasSize(2);
         assertThat(alarm.sent.get(0).text()).contains("새 글").doesNotContain("과거 글");
     }
 
@@ -254,7 +252,7 @@ class SlackReportForwardServiceTest {
         assertThat(text)
                 .contains("사물함 오류제보")
                 .contains("<@U123>")
-                .contains("2023-11-15 07:15") // 1700000100 = 2023-11-14 22:15:00 UTC = KST 07:15
+                .contains("2023-11-15 07:15")
                 .contains("3층 12번 사물함 잠금이 안 열려요")
                 .contains("https://workspace.slack.com/archives/C0REPORT/p1700000100000100");
     }
@@ -286,7 +284,7 @@ class SlackReportForwardServiceTest {
 
         service.forwardNewReports();
 
-        assertThat(alarm.sent).hasSize(4); // 요약 1 + 전달 3
+        assertThat(alarm.sent).hasSize(4);
         assertThat(alarm.sent.get(0).text()).contains("이전 7건").contains("생략");
         assertThat(alarm.sent.get(1).text()).contains("글8");
         assertThat(alarm.sent.get(3).text()).contains("글10");
@@ -390,7 +388,6 @@ class SlackReportForwardServiceTest {
         assertThat(alarm.sent).isEmpty();
         assertThat(cursor.store).containsEntry(CHANNEL, "1700000000.000000");
 
-        // 관리자가 생기면 같은 글이 그때 전달된다.
         recipients.ids = new ArrayList<>(List.of("admin3"));
         service.forwardNewReports();
         assertThat(alarm.sent).extracting(RecordingAlarm.Sent::to).containsExactly("admin3");
@@ -420,9 +417,9 @@ class SlackReportForwardServiceTest {
     void doesNotQueryRecipientsWhenNothingToSend() {
         cursor.store.put(CHANNEL, "1700000000.000000");
 
-        service.forwardNewReports(); // 새 글 없음
+        service.forwardNewReports();
         channel.messages.add(system("1700000100.000100", "channel_join"));
-        service.forwardNewReports(); // 시스템 메시지뿐
+        service.forwardNewReports();
 
         assertThat(recipients.calls).isZero();
         assertThat(cursor.store).containsEntry(CHANNEL, "1700000100.000100");

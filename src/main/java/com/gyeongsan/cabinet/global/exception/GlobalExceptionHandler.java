@@ -70,11 +70,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
-    /**
-     * 이 서비스가 직접 쓴 안내 문구는 그대로 돌려주되, 라이브러리가 던진 {@link IllegalArgumentException}(예: {@code
-     * Enum.valueOf} 의 "No enum constant com.…")처럼 패키지·클래스 이름이 보이는 메시지는 일반 문구로 바꾼다. 내부 구조가 응답으로 새지
-     * 않게 한다.
-     */
     static String clientSafeMessage(IllegalArgumentException e) {
         String message = e.getMessage();
         if (message == null || message.isBlank() || INTERNAL_DETAIL.matcher(message).find()) {
@@ -83,7 +78,6 @@ public class GlobalExceptionHandler {
         return message;
     }
 
-    /** 패키지 경로, 예외 클래스 이름, 스택 프레임, SQL 흔적. */
     private static final Pattern INTERNAL_DETAIL =
             Pattern.compile(
                     "\\b(?:com|org|java|javax|jakarta|io|net)\\.[a-z_][\\w.$]*"
@@ -91,8 +85,6 @@ public class GlobalExceptionHandler {
                             + "|\\bat [\\w.$]+\\("
                             + "|\\b(?:select|insert|update|delete)\\b[^.\\n]*\\b(?:from|into|set)\\b",
                     Pattern.CASE_INSENSITIVE);
-
-    // --- 클라이언트 요청 오류: 400/404/406/413/415. 스택·요청 내용은 로그에 남기지 않고 한 줄만 남긴다. ---
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<String>> handleUnreadableBody(
@@ -163,8 +155,6 @@ public class GlobalExceptionHandler {
         return clientError(e, HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
     }
 
-    // --- 동시 갱신 충돌: 낙관적 락(@Version) 충돌, 락 대기 초과, 교착 → 409. 다시 시도하면 되는 상황이다. ---
-
     @ExceptionHandler({
         OptimisticLockingFailureException.class,
         PessimisticLockingFailureException.class
@@ -178,7 +168,6 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ApiResponse<String>> clientError(
             Exception e, HttpStatus status, String message) {
-        // 요청 내용(본문, 파라미터 값)이 로그에 남지 않도록 예외 종류만 기록한다.
         log.warn("⚠️ 잘못된 요청 ({}): {}", status.value(), e.getClass().getSimpleName());
         return ResponseEntity.status(status).body(ApiResponse.fail(status, message));
     }

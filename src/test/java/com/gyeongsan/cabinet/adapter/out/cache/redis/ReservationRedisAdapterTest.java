@@ -19,7 +19,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** 예약 두 키(사물함 키, 유저 키)가 항상 함께 바뀌는지 실제 Redis 에서 확인한다. Docker 가 없으면 건너뛴다. */
 @Testcontainers(disabledWithoutDocker = true)
 class ReservationRedisAdapterTest {
 

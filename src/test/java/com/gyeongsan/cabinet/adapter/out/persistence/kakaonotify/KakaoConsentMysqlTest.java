@@ -58,10 +58,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * 실제 MySQL 8.0/8.4 에서 동의 저장소의 동시성·해지·토큰 회전 시나리오를 확인한다. 스키마는 운영과 같은 Flyway(V1~V6)로 만들고, 엔티티는
- * ddl-auto=validate 로 맞춘다. Docker 가 없으면 건너뛴다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class KakaoConsentMysqlTest {
 
@@ -219,14 +215,13 @@ class KakaoConsentMysqlTest {
             throws Exception {
         long user = newUser(c, "reconsent");
         repo.grant(user, "enc-1", "talk_message", LocalDateTime.now());
-        exec(c, "UPDATE `user` SET kakao_alarm = b'0' WHERE id = " + user); // 유저가 스위치를 끔
+        exec(c, "UPDATE `user` SET kakao_alarm = b'0' WHERE id = " + user);
 
         boolean activated = repo.grant(user, "enc-2", "talk_message", LocalDateTime.now());
 
         assertThat(activated).as("이미 유효한 동의를 다시 받아도 꺼 둔 스위치를 되돌리지 않는다").isFalse();
         assertThat(alarm(c, user)).isFalse();
         assertThat(consentRows(c, user)).isEqualTo(1);
-        // 토큰은 새 값으로 바뀌었다(스위치가 꺼져 있어 수신 대상은 아님).
         assertThat(repo.findActiveRecipient(user)).isEmpty();
         exec(c, "UPDATE `user` SET kakao_alarm = b'1' WHERE id = " + user);
         assertThat(repo.findActiveRecipient(user).orElseThrow().encryptedRefreshToken())
@@ -274,7 +269,6 @@ class KakaoConsentMysqlTest {
         long user = newUser(c, "cas");
         repo.grant(user, "enc-A", "talk_message", LocalDateTime.now());
 
-        // 재동의로 토큰이 enc-B 로 바뀐 뒤에 옛 토큰(enc-A)으로 해지·회전을 시도하면 무시된다.
         repo.grant(user, "enc-B", "talk_message", LocalDateTime.now());
         assertThat(repo.revokeIfTokenUnchanged(user, "enc-A", LocalDateTime.now())).isFalse();
         assertThat(repo.rotateIfTokenUnchanged(user, "enc-A", "enc-X")).isFalse();
@@ -282,12 +276,10 @@ class KakaoConsentMysqlTest {
         assertThat(repo.findActiveRecipient(user).orElseThrow().encryptedRefreshToken())
                 .isEqualTo("enc-B");
 
-        // 읽은 값 그대로면 회전된다.
         assertThat(repo.rotateIfTokenUnchanged(user, "enc-B", "enc-C")).isTrue();
         assertThat(repo.findActiveRecipient(user).orElseThrow().encryptedRefreshToken())
                 .isEqualTo("enc-C");
 
-        // 해지된 동의는 회전되지 않고, 이미 해지된 것을 다시 해지해도 false.
         assertThat(repo.revokeIfTokenUnchanged(user, "enc-C", LocalDateTime.now())).isTrue();
         assertThat(repo.rotateIfTokenUnchanged(user, "enc-C", "enc-D")).isFalse();
         assertThat(repo.revokeIfTokenUnchanged(user, "enc-C", LocalDateTime.now())).isFalse();
@@ -311,7 +303,6 @@ class KakaoConsentMysqlTest {
         assertThat(results).as("'첫 동의'로 판정되는 것은 정확히 한 번").filteredOn(b -> b).hasSize(1);
         assertThat(repo.findStatus(user)).isEqualTo(new KakaoNotifyStatus(true, true));
 
-        // DB 제약도 직접 확인: 같은 유저로 두 번째 행은 들어갈 수 없다.
         assertThatThrownBy(
                         () ->
                                 exec(
@@ -361,7 +352,6 @@ class KakaoConsentMysqlTest {
         assertThat(adapter.findKakaoProviderId(none)).isEmpty();
     }
 
-    /** 가짜 카카오 + 실제 DB·암호화로 전달기를 끝까지 돌려, 해지·회전이 DB 에 실제로 반영되는지 본다. */
     private void forwarderAgainstRealDatabase(Connection c, KakaoConsentRepositoryPort repo)
             throws Exception {
         AesGcmTokenCipher cipher = new AesGcmTokenCipher(key());
@@ -389,8 +379,7 @@ class KakaoConsentMysqlTest {
                     @Override
                     public KakaoRefreshedToken refreshAccessToken(String refreshToken) {
                         if (refreshToken.equals("rt-gone")) {
-                            throw new KakaoInvalidGrantException(
-                                    "invalid_grant"); // 유저가 카카오에서 동의 해지
+                            throw new KakaoInvalidGrantException("invalid_grant");
                         }
                         return new KakaoRefreshedToken("at-" + refreshToken, "rt-fine-rotated");
                     }
@@ -450,7 +439,6 @@ class KakaoConsentMysqlTest {
         assertThat(sentTo).containsOnlyKeys("at-rt-fine");
         assertThat(repo.findStatus(gone).consented()).as("invalid_grant 면 DB 에서 해지 처리된다").isFalse();
         assertThat(repo.findStatus(fine).consented()).isTrue();
-        // 회전된 refresh_token 이 암호화된 채 저장되어 있고 복호화하면 새 값이다.
         String stored = repo.findActiveRecipient(fine).orElseThrow().encryptedRefreshToken();
         assertThat(stored).doesNotContain("rt-fine-rotated");
         assertThat(cipher.decrypt(stored, "kakao-notify:" + fine)).isEqualTo("rt-fine-rotated");

@@ -67,7 +67,6 @@ class KeyedSlidingWindowLimiterTest {
         assertThat(limiter.trackedKeys()).isGreaterThan(2_000);
 
         nowNanos.addAndGet(5_000_000_000L);
-        // 정리는 일정 횟수마다 돌므로 충분히 호출한다.
         for (int i = 0; i < 1_100; i++) {
             limiter.tryAcquire(1_000_000L);
         }

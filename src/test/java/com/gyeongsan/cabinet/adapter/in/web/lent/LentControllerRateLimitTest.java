@@ -78,7 +78,6 @@ class LentControllerRateLimitTest {
                         AutoConfigurations.of(
                                 AopAutoConfiguration.class, RateLimiterAutoConfiguration.class))
                 .withUserConfiguration(ControllerConfig.class)
-                // 한도 값 자체가 아니라 "적용되는지"를 보기 위해, 갱신되지 않는 작은 한도로 덮어쓴다.
                 .withPropertyValues(
                         "resilience4j.ratelimiter.instances.lentApi.limitForPeriod=3",
                         "resilience4j.ratelimiter.instances.lentApi.limitRefreshPeriod=1h",
@@ -93,7 +92,6 @@ class LentControllerRateLimitTest {
                             controller.makeReservation(102, principal);
                             controller.useExtension(principal);
 
-                            // 같은 한도를 예약 말고 다른 엔드포인트도 함께 쓴다.
                             assertThatThrownBy(() -> controller.makeReservation(103, principal))
                                     .isInstanceOf(RequestNotPermitted.class);
                             assertThatThrownBy(() -> controller.useExtension(principal))

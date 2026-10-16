@@ -7,13 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * 42 API 의 cursus_users 를 {@link FtCursusEntry} 목록으로 바꾼다. 로그인(/v2/me, Map)과 지급일
- * 재조회(/v2/users/:login, JsonNode)가 같은 규칙을 쓰도록 한 곳에 둔다.
- *
- * <p>반환값이 비어 있으면 "해석 실패"(cursus_users 가 없거나 배열이 아님)이고, 빈 목록이면 "항목 없음"이다. 둘은 구분해서 다뤄야 한다. 형식이 깨진 개별
- * 항목은 건너뛴다.
- */
 public final class FtCursusParser {
 
     private FtCursusParser() {}

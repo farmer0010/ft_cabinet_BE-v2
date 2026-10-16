@@ -31,7 +31,6 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.FileSystemResource;
 
-/** 운영 application.yml 기본값 그대로(꺼짐), 켰을 때의 필수 설정 검증, 서로 의존하는 두 스위치의 조합을 확인한다. */
 class KakaoNotifyConfigTest {
 
     private static final Path MAIN_YML = Path.of("src/main/resources/application.yml");
@@ -97,7 +96,6 @@ class KakaoNotifyConfigTest {
                             assertThat(context).hasSingleBean(TokenCipherPort.class);
                             assertThat(context).hasSingleBean(GrantKakaoNotifyConsentUseCase.class);
                             assertThat(context).hasSingleBean(KakaoNotifySettingsUseCase.class);
-                            // 공지 전달은 따로 켜야 한다.
                             assertThat(context).doesNotHaveBean(ForwardSlackNoticesUseCase.class);
                         });
     }

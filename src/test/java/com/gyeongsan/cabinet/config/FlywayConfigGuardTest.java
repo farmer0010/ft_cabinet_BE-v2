@@ -14,7 +14,6 @@ import org.springframework.core.env.PropertySource;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.core.io.FileSystemResource;
 
-/** CLAUDE.md 절대 규칙 3, 4 를 설정 수준에서 지키는지 확인한다. */
 class FlywayConfigGuardTest {
 
     private static final Path MAIN_YML = Path.of("src/main/resources/application.yml");

@@ -52,7 +52,6 @@ public class AuthController {
 
         String userId = jwtTokenProvider.parseClaims(refreshToken).getSubject();
 
-        // 서명이 검증된 토큰의 사용자 ID 로만 한도를 센다. 검증 전 요청은 전역 한도도, Redis/DB 도 쓰지 않는다.
         long userIdNumber;
         try {
             userIdNumber = Long.parseLong(userId);
@@ -97,7 +96,6 @@ public class AuthController {
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable("provider") String provider,
             @RequestBody OAuthLinkRequest request) {
-        // /v4/auth/** 는 비로그인으로 열려 있어 로그인하지 않은 요청도 여기까지 온다.
         if (userPrincipal == null) {
             throw new ServiceException(ErrorCode.AUTHENTICATION_REQUIRED);
         }

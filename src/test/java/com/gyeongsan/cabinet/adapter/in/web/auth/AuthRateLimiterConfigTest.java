@@ -14,7 +14,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.filter.ForwardedHeaderFilter;
 
-/** 운영 설정 파일의 기본값과 환경변수 덮어쓰기, 그리고 X-Forwarded-For 가 서블릿 요청 주소에 반영되지 않는다는 사실을 확인한다. */
 class AuthRateLimiterConfigTest {
 
     private static final Path MAIN_YML = Path.of("src/main/resources/application.yml");
@@ -81,11 +80,9 @@ class AuthRateLimiterConfigTest {
     @DisplayName(
             "[스푸핑 분석] forward-headers-strategy=framework 에서는 클라이언트가 보낸 X-Forwarded-For 의 첫 값이 getRemoteAddr() 가 된다")
     void forwardedHeaderFilterLetsClientSpoofRemoteAddr() throws Exception {
-        // 실제 경로: 클라이언트 → Azure 프런트엔드 → nginx($proxy_add_x_forwarded_for 는 클라이언트가 보낸 값 뒤에 덧붙인다) → 앱.
-        // 그래서 앱이 받는 헤더는 "<클라이언트가 쓴 값>, <진짜 주소>" 형태이고, 첫 값은 공격자가 정한다.
         MockHttpServletRequest request =
                 new MockHttpServletRequest(HttpMethod.POST.name(), "/v4/auth/reissue");
-        request.setRemoteAddr("10.1.2.3"); // 직접 연결한 프록시(nginx)의 주소
+        request.setRemoteAddr("10.1.2.3");
         request.addHeader("X-Forwarded-For", "203.0.113.77, 198.51.100.9");
         request.addHeader("X-Forwarded-Proto", "https");
 

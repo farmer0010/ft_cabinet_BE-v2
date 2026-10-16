@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 로그인한 사용자가 FAQ 챗봇에 묻는 API. 기능이 꺼져 있으면(app.chatbot.enabled=false) 이 컨트롤러 자체가 등록되지 않는다. */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/v4/chatbot")
@@ -42,7 +41,6 @@ public class ChatbotController {
                 AskResponse.from(askChatbot.ask(request.question()), settings.fallbackMessage()));
     }
 
-    /** 분류별 질문 목록. 프론트가 "자주 묻는 질문" 버튼을 보여주는 데 쓴다(임베딩 계산 없음). */
     @GetMapping("/faqs")
     public ApiResponse<FaqListResponse> faqs() {
         Map<String, List<FaqItem>> grouped = new LinkedHashMap<>();

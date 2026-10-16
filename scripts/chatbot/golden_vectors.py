@@ -52,7 +52,6 @@ def main() -> int:
     from sentence_transformers import SentenceTransformer
 
     model = SentenceTransformer(repo, revision=revision, device="cpu")
-    # Java 어댑터가 쓰는 최대 토큰 수와 같게 맞춘다(길이가 긴 입력의 자르기 결과를 비교하려는 것).
     model.max_seq_length = max_tokens
     vectors = model.encode(
         [prefix + t for t in texts],

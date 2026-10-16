@@ -13,10 +13,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * 오류제보 → 관리자 DM 전달 기능. SLACK_REPORT_FORWARD_ENABLED=true 일 때만 켜지고, 켠 상태에서 채널 ID 가 없으면 부팅이 실패한다. 설정
- * 실수로 엉뚱한 환경(특히 운영)의 채널을 조용히 읽는 일을 막기 위해 기본은 꺼 둔다.
- */
 @Configuration
 @ConditionalOnProperty(name = "app.slack-report.enabled", havingValue = "true")
 public class SlackReportConfig {

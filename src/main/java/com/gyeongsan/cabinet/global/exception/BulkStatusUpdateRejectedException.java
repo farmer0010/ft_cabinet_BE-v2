@@ -5,7 +5,6 @@ import java.util.stream.Collectors;
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
-/** 사물함 일괄 변경이 거부되었음을 알린다. 거부된 요청은 아무 변경도 남기지 않는다. */
 @Getter
 public class BulkStatusUpdateRejectedException extends RuntimeException {
 
@@ -16,7 +15,6 @@ public class BulkStatusUpdateRejectedException extends RuntimeException {
         this.rejection = rejection;
     }
 
-    /** 존재하지 않는 ID 가 하나라도 있으면 404, 대여 중인 사물함 때문이면 409. */
     public HttpStatus getStatus() {
         return rejection.missingCabinetIds().isEmpty() ? HttpStatus.CONFLICT : HttpStatus.NOT_FOUND;
     }

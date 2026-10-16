@@ -41,18 +41,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * 사물함 일괄 변경(CABINET_BULK_STATUS_UPDATE)의 Undo.
- *
- * <p>원래 작업이 남긴 변경 전/후 값으로 되돌린다. 되돌리려는 대상이 원래 작업 직후 상태와 하나라도 다르면(그 사이 바뀌었으면) 아무것도 바꾸지 않고 전체를 거부하며,
- * 충돌은 한 번에 모두 알려 준다. 이 작업이 건드린 것은 사물함 상태(status, lentType, 메모)와 대여 종료(endedAt)뿐이라 코인, 아이템, 패널티는 되돌릴
- * 것이 없다.
- *
- * <p>락 순서는 사용자 → 사물함(각각 ID 오름차순)이며 대여·이사·반납·관리자 일괄 변경과 같다. 같은 사용자의 동시 대여와 겹쳐도 활성 대여가 둘이 되지 않도록 두
- * 단계로 나눈다. 1단계는 읽기 전용의 짧은 트랜잭션으로 원본 감사 기록(한 번 만들어지면 바뀌지 않는다)을 읽어 잠글 대상을 정하고, 2단계 트랜잭션은 락 획득을 첫 DB
- * 문장으로 두어 락 뒤의 일반 SELECT 가 최신 커밋을 보게 한다. "이미 되돌렸나"(findUndoBatchIdOf)도 락 뒤에 다시 확인한다. 락 전에 일반 SELECT
- * 로 스냅샷을 잡으면 락 뒤의 검사가 그 시점의 낡은 상태를 보기 때문이다(감사 M-8).
- */
 @Service
 @Log4j2
 public class AdminUndoService implements AdminUndoUseCase {
@@ -83,10 +71,6 @@ public class AdminUndoService implements AdminUndoUseCase {
         this.readOnlyTransactionTemplate.setReadOnly(true);
     }
 
-    /**
-     * 1단계에서 읽은 원본 기록과, 2단계에서 잠글 대상 ID. 감사 기록은 한 번 만들어지면 바뀌지 않으므로 락 없이 읽어도 낡을 일이 없다. (낡을 수 있는 것은
-     * 사용자, 사물함, 대여의 현재 상태이고, 그것들은 2단계에서 락을 잡은 뒤에 읽는다.)
-     */
     private record UndoPlan(
             AdminActionLog original,
             List<AdminActionLogItem> cabinetItems,
@@ -116,12 +100,8 @@ public class AdminUndoService implements AdminUndoUseCase {
                     "되돌리기 사유(reason)는 " + AdminActionLog.REASON_MAX_LENGTH + "자 이하여야 합니다.");
         }
 
-        // 1단계: 원본 기록을 읽어 잠글 대상을 정한다. 읽기 전용의 짧은 트랜잭션이라 여기서 잡힌 스냅샷은 2단계에 이어지지 않는다.
-        // (락 전에 일반 SELECT 로 스냅샷을 잡으면, 락을 얻은 뒤의 "활성 대여 있나" 검사가 그 시점의 낡은 상태를 본다 - 감사 M-8.)
         UndoPlan plan = readOnlyTransactionTemplate.execute(status -> planOf(batchId));
 
-        // 2단계: 락 획득(사용자 -> 사물함 ID 오름차순)이 이 트랜잭션의 첫 DB 문장이다. 이후의 모든 일반 SELECT 는 락 뒤에 처음 스냅샷이 잡혀 최신
-        // 커밋을 본다.
         return transactionTemplate.execute(
                 status -> undoUnderLocks(batchId, undoBatchId, reason, actor, plan));
     }
@@ -165,8 +145,6 @@ public class AdminUndoService implements AdminUndoUseCase {
         List<Long> userIds = plan.userIds();
         List<Long> cabinetIds = plan.cabinetIds();
 
-        // 락: 사용자 → 사물함, 각각 ID 오름차순(대여·이사·반납·관리자 일괄 변경과 같은 순서). 락을 먼저 잡아야 아래의 "이미 되돌렸나" 확인과 상태 비교가
-        // 확정된다.
         Map<Long, User> users = new HashMap<>();
         for (Long userId : userIds) {
             userRepository.findByIdWithLock(userId).ifPresent(u -> users.put(userId, u));
@@ -197,7 +175,6 @@ public class AdminUndoService implements AdminUndoUseCase {
                                             "이미 되돌려진 작업입니다: " + alreadyUndoneBy.get()))));
         }
 
-        // DB 시각은 마이크로초까지만 저장되므로 비교와 기록 모두 마이크로초 기준으로 맞춘다.
         LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
         List<UndoRejection.Conflict> conflicts = new ArrayList<>();
 
@@ -229,7 +206,6 @@ public class AdminUndoService implements AdminUndoUseCase {
             throw new UndoRejectedException(new UndoRejection(null, conflicts));
         }
 
-        // 복구: 로그의 변경 전 값을 그대로 되돌린다.
         List<AdminActionLogItem> undoItems = new ArrayList<>();
         List<UndoResponse.RestoredCabinet> restoredCabinets = new ArrayList<>();
         List<UndoResponse.ReopenedLent> reopenedLents = new ArrayList<>();
@@ -280,7 +256,6 @@ public class AdminUndoService implements AdminUndoUseCase {
         Map<String, Object> requestSnapshot = new LinkedHashMap<>();
         requestSnapshot.put("undoOfBatchId", batchId);
         requestSnapshot.put("reason", reason);
-        // 변경과 같은 트랜잭션에서 저장한다. 같은 원본에 대한 두 번째 Undo 는 UNIQUE 제약으로도 막힌다.
         adminActionLogPort.save(
                 new AdminActionLog(
                         undoBatchId,
@@ -458,7 +433,6 @@ public class AdminUndoService implements AdminUndoUseCase {
         }
     }
 
-    /** 로그 항목의 변경 전/후를 맞바꾼 항목. Undo 기록도 같은 형식이라 필요하면 다시 읽을 수 있다. */
     private static AdminActionLogItem inverse(AdminActionLogItem item) {
         return new AdminActionLogItem(
                 item.targetType(),
@@ -529,7 +503,6 @@ public class AdminUndoService implements AdminUndoUseCase {
         return request.reason().strip();
     }
 
-    /** 관리자 입력이 로그에 줄바꿈 등 제어문자를 끼워 넣어 로그 줄을 위조하지 못하게 한다. */
     private static String sanitizeForLog(String value) {
         return value == null ? null : value.replaceAll("\\p{Cntrl}", " ");
     }

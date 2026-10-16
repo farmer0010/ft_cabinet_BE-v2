@@ -6,11 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 관리자 작업 1회의 감사 기록. 한 번 남기면 수정하거나 지우지 않는다(추가 전용).
- *
- * <p>undoOfBatchId 는 이 기록이 Undo 일 때, 되돌린 원래 작업의 batchId 이다.
- */
 public record AdminActionLog(
         String batchId,
         AdminActionType actionType,
@@ -23,7 +18,6 @@ public record AdminActionLog(
 
     public static final int REASON_MAX_LENGTH = 255;
 
-    /** 일반 작업 기록. Undo 기록이 아니므로 undoOfBatchId 는 없다. */
     public AdminActionLog(
             String batchId,
             AdminActionType actionType,

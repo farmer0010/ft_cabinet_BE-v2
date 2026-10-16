@@ -26,14 +26,9 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * 운영 베이스라인(V1)과 V2~V6 가 실제 MySQL 8.0/8.4 에서 어떻게 맞물리는지, 그리고 그 스키마가 모든 엔티티와 {@code ddl-auto=validate}
- * 로 맞는지 확인한다. 테스트 서버를 update 에서 validate 로 바꿔도 되는지의 근거가 되는 테스트다. Docker 가 없으면 건너뛴다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class FlywayBaselineMysqlTest {
 
-    /** 모든 엔티티를 스캔한다(운영 부팅과 같은 범위). */
     @Configuration
     @EntityScan("com.gyeongsan.cabinet")
     static class AllEntitiesConfig {}
@@ -69,7 +64,6 @@ class FlywayBaselineMysqlTest {
         return rows;
     }
 
-    /** 운영과 같은 ddl-auto=validate 로 모든 엔티티를 이 DB 에 대해 검증한다(Flyway 는 끈다). */
     private static void assertEntitiesValidate(MariaDbDriverMySqlContainer mysql) {
         new ApplicationContextRunner()
                 .withConfiguration(
@@ -111,7 +105,6 @@ class FlywayBaselineMysqlTest {
     void productionPathSkipsV1AndKeepsData(String image) throws Exception {
         try (MariaDbDriverMySqlContainer mysql = new MariaDbDriverMySqlContainer(image)) {
             mysql.start();
-            // 운영처럼 이미 있는 스키마 + 데이터. (V1 을 JDBC 로 직접 실행 = 사람이 만들어 둔 상태)
             BaselinedSchema.createExistingTables(mysql);
             try (Connection c = connect(mysql);
                     Statement s = c.createStatement()) {
@@ -126,7 +119,6 @@ class FlywayBaselineMysqlTest {
             assertThat(history(mysql))
                     .containsExactly(
                             "1:BASELINE:1", "2:SQL:1", "3:SQL:1", "4:SQL:1", "5:SQL:1", "6:SQL:1");
-            // V1 이 실행됐다면 (CREATE TABLE 충돌로 실패하거나, DROP 이 있었다면 데이터가 사라졌을 것이다.)
             try (Connection c = connect(mysql);
                     Statement s = c.createStatement();
                     ResultSet rs = s.executeQuery("SELECT COUNT(*) FROM `user`")) {
@@ -181,13 +173,12 @@ class FlywayBaselineMysqlTest {
     void updateBuiltSchemaNeedsBaselineAtLatestVersion(String image) throws Exception {
         try (MariaDbDriverMySqlContainer mysql = new MariaDbDriverMySqlContainer(image)) {
             mysql.start();
-            flyway(mysql).migrate(); // V1~V6 까지 반영된 완성 스키마
+            flyway(mysql).migrate();
             try (Connection c = connect(mysql);
                     Statement s = c.createStatement()) {
-                s.execute("DROP TABLE flyway_schema_history"); // update 로 만든 DB 처럼 이력이 없는 상태
+                s.execute("DROP TABLE flyway_schema_history");
             }
 
-            // 잘못된 선택: baseline(1) 이면 V2 가 이미 있는 테이블을 만들려다 실패한다(데이터는 건드리지 않음).
             Flyway wrong = flyway(mysql);
             wrong.baseline();
             assertThatThrownBy(wrong::migrate).isInstanceOf(FlywayException.class);

@@ -22,21 +22,6 @@ import org.springframework.data.redis.connection.stream.StreamRecords;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.stream.StreamListener;
 
-/**
- * 수령(XREADGROUP)만 하고 ACK 하지 못한 메시지를 다시 처리한다.
- *
- * <p>소비자 이름이 부팅마다 새 UUID 이고 구독이 {@code lastConsumed}({@code >}) 로만 읽으므로, 처리 중 죽은 프로세스가 수령해 둔
- * 메시지(PEL)는 아무도 다시 읽지 않았다. 이 클래스가 일정 시간(minIdle) 넘게 방치된 PEL 항목을 어느 소비자 것이든 현재 소비자로 가져와({@code
- * XCLAIM}) 같은 리스너로 다시 처리한다.
- *
- * <ul>
- *   <li>XCLAIM 의 min-idle 조건은 서버 안에서 원자적이라, 여러 인스턴스가 동시에 시도해도 한 곳만 가져가고 정상 처리 중인 메시지(방치 시간이 짧음)는
- *       건드리지 않는다.
- *   <li>리스너는 처리를 마치면 스스로 ACK·삭제한다. ACK 하지 않고 실패하는 메시지는 배달 횟수가 {@code maxDeliveries} 를 넘으면
- *       '{스트림}:dead' 스트림으로 옮기고 ACK·삭제해, 같은 메시지가 영원히 재시도되지 않게 한다.
- *   <li>적어도 한 번(at-least-once) 처리이므로 리스너는 같은 메시지를 두 번 받아도 안전해야 한다.
- * </ul>
- */
 @Log4j2
 public class StreamPendingReclaimer implements InitializingBean, DisposableBean {
 
@@ -100,12 +85,10 @@ public class StreamPendingReclaimer implements InitializingBean, DisposableBean 
         try {
             reclaimOnce();
         } catch (RuntimeException e) {
-            // 다음 주기에 다시 시도한다. 스케줄러가 예외로 멈추지 않게 여기서 끊는다.
             log.warn("[RedisStream] 방치된 메시지 회수 중 오류: {}", e.getClass().getSimpleName());
         }
     }
 
-    /** 모든 스트림에서 방치된 메시지를 한 번 회수해 처리한다. 처리한 개수를 돌려준다. */
     public int reclaimOnce() {
         int handled = 0;
         for (Map.Entry<String, StreamListener<String, MapRecord<String, String, String>>> e :
@@ -163,7 +146,6 @@ public class StreamPendingReclaimer implements InitializingBean, DisposableBean 
                 listener.onMessage(toStringRecord(streamKey, record));
                 handled++;
             } catch (RuntimeException ex) {
-                // ACK 되지 않은 채 남아 다음 주기에 다시 시도되고, 한도를 넘으면 dead 로 옮겨진다.
                 log.warn(
                         "[RedisStream] {} 메시지 {} 재처리 실패: {}",
                         streamKey,
@@ -184,7 +166,6 @@ public class StreamPendingReclaimer implements InitializingBean, DisposableBean 
                         XAddOptions.maxlen(DEAD_LETTER_MAX_LENGTH).approximateTrimming(true));
         template.opsForStream().acknowledge(streamKey, group, record.getId());
         template.opsForStream().delete(streamKey, record.getId());
-        // 본문(사용자 ID·DM 내용)은 로그에 남기지 않는다.
         log.error(
                 "[RedisStream] {} 메시지 {} 가 {}회 넘게 실패해 {} 로 옮겼습니다",
                 streamKey,

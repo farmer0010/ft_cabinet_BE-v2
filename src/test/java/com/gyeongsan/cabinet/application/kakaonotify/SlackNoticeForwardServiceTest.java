@@ -63,7 +63,6 @@ class SlackNoticeForwardServiceTest {
             return messages.stream().map(SlackChannelMessage::ts).reduce((a, b) -> b);
         }
 
-        /** ts → 퍼머링크. 비어 있으면 퍼머링크를 못 얻는 상황. */
         final Map<String, String> permalinks = new HashMap<>();
 
         RuntimeException permalinkFailure;
@@ -97,7 +96,6 @@ class SlackNoticeForwardServiceTest {
         }
     }
 
-    /** 동의 테이블과 알림 스위치를 메모리에 흉내 낸다. 토큰 비교 조건(CAS)도 실제 저장소와 같게 동작한다. */
     static class FakeConsents implements KakaoConsentRepositoryPort {
         static final class Row {
             String name;
@@ -111,7 +109,6 @@ class SlackNoticeForwardServiceTest {
         boolean failList;
         boolean failFind;
 
-        /** 수신 대상 목록을 돌려준 직후 실행한다(목록과 발송 직전 재확인 사이의 변화를 흉내 낸다). */
         Runnable afterListHook;
 
         int listCalls;
@@ -186,17 +183,15 @@ class SlackNoticeForwardServiceTest {
         }
     }
 
-    /** 사용자별로 정해 둔 대로 응답하는 가짜 카카오. 평문 refresh_token 을 키로 동작을 정한다. */
     static class FakeKakao implements KakaoNotificationPort {
         record Sent(String accessToken, KakaoMessage message) {}
 
         final Map<String, RuntimeException> refreshFailures = new HashMap<>();
-        final Map<String, String> rotated = new HashMap<>(); // 평문 refresh → 새 refresh
-        final Map<String, RuntimeException> sendFailures = new HashMap<>(); // access → 오류
+        final Map<String, String> rotated = new HashMap<>();
+        final Map<String, RuntimeException> sendFailures = new HashMap<>();
         final List<String> refreshCalls = new ArrayList<>();
         final List<Sent> sent = new ArrayList<>();
 
-        /** 이 문구가 들어간 메시지는 일시 장애(503)로 실패한다. null 이면 꺼짐. */
         String sendFailureWhenTextContains;
 
         @Override
@@ -255,7 +250,6 @@ class SlackNoticeForwardServiceTest {
         cursor = new FakeCursor();
         consents = new FakeConsents();
         kakao = new FakeKakao();
-        // 퍼머링크 관련 테스트가 이 설정을 쓴다. 퍼머링크의 기본값은 꺼짐이므로 여기서는 명시적으로 켠다.
         service =
                 serviceWith(new SlackNoticeSettings(CHANNEL, 3, 24, "https://front.example", true));
         cursor.store.put(CHANNEL, "1700000000.000000");
@@ -324,7 +318,6 @@ class SlackNoticeForwardServiceTest {
         addRecipient(1, "stays");
         addRecipient(2, "turns-off");
         channel.messages.add(msg("1700000100.000100", "공지"));
-        // 목록 조회가 끝난 직후 2번이 알림을 끈 상황을 만든다.
         FakeConsents racing =
                 new FakeConsents() {
                     @Override
@@ -451,7 +444,6 @@ class SlackNoticeForwardServiceTest {
                 .extracting(FakeKakao.Sent::accessToken)
                 .containsExactly("access-of-rt-2");
 
-        // 해지된 뒤로는 대상에서 빠진다: 다음 공지에서 갱신 시도조차 하지 않는다.
         kakao.refreshCalls.clear();
         channel.messages.add(msg("1700000200.000100", "다음 공지"));
         service.forwardNewNotices();
@@ -520,7 +512,7 @@ class SlackNoticeForwardServiceTest {
                     @Override
                     public boolean rotateIfTokenUnchanged(
                             Long userId, String expected, String newToken) {
-                        rows.get(userId).encrypted = reConsented; // 회전 저장 직전에 재동의가 끼어듦
+                        rows.get(userId).encrypted = reConsented;
                         return super.rotateIfTokenUnchanged(userId, expected, newToken);
                     }
                 };
@@ -735,7 +727,7 @@ class SlackNoticeForwardServiceTest {
         service.forwardNewNotices();
 
         List<FakeKakao.Sent> sent = kakao.sent;
-        assertThat(sent).hasSize(4); // 요약 1 + 최근 3건 (maxPerPoll=3)
+        assertThat(sent).hasSize(4);
         assertThat(sent.get(0).message().text()).contains("생략");
         assertThat(sent.get(0).message().linkUrl()).isEqualTo("https://front.example");
         assertThat(sent.get(1).message().linkUrl()).isEqualTo("https://ws.slack.com/p3");
@@ -786,8 +778,6 @@ class SlackNoticeForwardServiceTest {
         assertThat(channel.permalinkCalls).isEmpty();
     }
 
-    // ---- 커서 전진 규칙(M-11): 아무에게도 못 보냈고 재시도로 풀릴 수 있으면 보류, 그 밖에는 전진 ----
-
     private static final String START = "1700000000.000000";
 
     @Test
@@ -805,7 +795,7 @@ class SlackNoticeForwardServiceTest {
         assertThat(cursor.store).containsEntry(CHANNEL, START);
         assertThat(consents.rows.values()).noneMatch(r -> r.revoked);
 
-        kakao.sendFailures.clear(); // 카카오 복구
+        kakao.sendFailures.clear();
         service.forwardNewNotices();
         service.forwardNewNotices();
 
@@ -900,7 +890,6 @@ class SlackNoticeForwardServiceTest {
     void allConsentsGoneBetweenListAndSendAdvances() {
         addRecipient(1, "a");
         channel.messages.add(msg("1700000100.000100", "공지"));
-        // 목록 조회 직후 발송 직전 재확인에서 빠지도록, 조회 시점에만 활성으로 보이게 한다.
         FakeConsents.Row row = consents.rows.get(1L);
         consents.afterListHook = () -> row.alarm = false;
 
@@ -946,7 +935,6 @@ class SlackNoticeForwardServiceTest {
         service.forwardNewNotices();
         assertThat(cursor.store).containsEntry(CHANNEL, before);
 
-        // 한 시간이 더 지나 보류 한도를 넘었다.
         SlackNoticeForwardService later =
                 new SlackNoticeForwardService(
                         channel,

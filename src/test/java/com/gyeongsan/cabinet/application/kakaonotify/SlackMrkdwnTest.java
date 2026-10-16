@@ -43,7 +43,6 @@ class SlackMrkdwnTest {
         String cut = SlackMrkdwn.truncate("가".repeat(300), 200);
         assertThat(cut.codePointCount(0, cut.length())).isEqualTo(200);
         assertThat(cut).endsWith("…");
-        // 이모지(서로게이트 쌍)가 반으로 잘리지 않는다.
         String emoji = SlackMrkdwn.truncate("😀".repeat(50), 10);
         assertThat(emoji.codePointCount(0, emoji.length())).isEqualTo(10);
         assertThat(emoji).doesNotContain("\uD83D…");

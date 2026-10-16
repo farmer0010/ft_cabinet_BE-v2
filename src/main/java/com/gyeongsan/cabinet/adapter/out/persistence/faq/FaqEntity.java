@@ -60,7 +60,6 @@ public class FaqEntity {
         return new FaqEntity();
     }
 
-    /** 질문 표현 목록을 통째로 교체한다(순서가 곧 대표 질문 순서). */
     public void replaceQuestions(List<String> texts) {
         questions.clear();
         for (int i = 0; i < texts.size(); i++) {

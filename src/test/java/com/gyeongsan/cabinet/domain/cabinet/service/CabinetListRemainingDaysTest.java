@@ -22,7 +22,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/** 사물함 목록의 daysRemaining 이 /me, 반납 응답과 같은 달력 기준인지 확인한다. */
 class CabinetListRemainingDaysTest {
 
     private List<CabinetListResponseDto> listWithLentExpiringAt(LocalDateTime expiredAt) {
@@ -46,7 +45,6 @@ class CabinetListRemainingDaysTest {
     @Test
     @DisplayName("만료 시각이 24시간 미만으로 남았어도 날짜가 내일이면 1 이다 (이전에는 0 으로 버림됐다)")
     void tomorrowIsOneEvenWithinTwentyFourHours() {
-        // 만료일 내일 00:01: 지금이 언제든 24시간을 넘지 않을 수 있지만 달력상으로는 하루 남았다.
         List<CabinetListResponseDto> list =
                 listWithLentExpiringAt(LocalDate.now().plusDays(1).atTime(0, 1));
 

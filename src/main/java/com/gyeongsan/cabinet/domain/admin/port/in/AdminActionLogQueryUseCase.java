@@ -7,7 +7,6 @@ import org.springframework.data.domain.Pageable;
 
 public interface AdminActionLogQueryUseCase {
 
-    /** 최신순 목록. 한 번에 가져오는 개수는 상한(100)을 둔다. */
     Page<AdminActionLogSummaryResponse> getActionLogs(Pageable pageable);
 
     AdminActionLogDetailResponse getActionLog(String batchId);

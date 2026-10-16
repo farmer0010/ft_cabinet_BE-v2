@@ -145,7 +145,6 @@ class CabinetReservationExposureTest {
         @SuppressWarnings("unchecked")
         void onlyAvailableCabinetsAreQueried() {
             Map<Integer, Long> redis = Map.of(101, OTHER, 104, OTHER, 105, OTHER);
-            // 실제 어댑터처럼 요청받은 번호의 예약만 돌려준다.
             when(reservationPort.getReservedUserIds(any()))
                     .thenAnswer(
                             call -> {

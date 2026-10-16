@@ -24,10 +24,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/**
- * 감사 H-7 후속: 방치된 메시지를 다시 처리하면(적어도 한 번 처리) 같은 로그타임 메시지가 두 번 처리될 수 있다. 그때 보상이 두 번 나가지 않는지, 어떤 경우에 중복이
- * 생기는지를 고정한다.
- */
 class UserDomainServiceLogtimeIdempotencyTest {
 
     private static final Long USER_ID = 9L;
@@ -91,9 +87,9 @@ class UserDomainServiceLogtimeIdempotencyTest {
     @DisplayName("알려진 한계: 첫 처리 뒤 대여권을 쓰고 나서 같은 지급일 메시지가 재처리되면 한 장 더 나간다")
     void duplicatePayDayMessageAfterTicketUsedGrantsAgain() {
         service.processLogtimeTransaction(USER_ID, lentTicket, 5000, true);
-        unusedTickets.set(0); // 사용자가 그 사이 대여권을 썼다.
+        unusedTickets.set(0);
         service.processLogtimeTransaction(USER_ID, lentTicket, 5000, true);
 
-        assertThat(granted).as("월별 지급 기록이 없어 막지 못한다 (CLAUDE.md 트센 혜택의 알려진 한계 ①)").hasValue(2);
+        assertThat(granted).as("월별 지급 기록이 없어 막지 못한다 (알려진 한계)").hasValue(2);
     }
 }

@@ -11,7 +11,6 @@ public record LentReturnRequest(
                 String shareCode,
         String reason) {
 
-    /** 공유 비밀번호는 로그에 남기지 않는다(우연히 이 객체가 로그에 찍혀도 값이 보이지 않게 한다). */
     @Override
     public String toString() {
         return "LentReturnRequest[shareCode=****, reason="

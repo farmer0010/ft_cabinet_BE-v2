@@ -34,10 +34,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * 로그 조회 쿼리(서브쿼리 프로젝션, EntityGraph, Undo 유니크)를 실제 MySQL 에서 확인한다. 테이블은 운영과 같이 Flyway(V2, V3)로 만들고
- * Hibernate 는 validate 로 둔다. Docker 가 없으면 건너뛴다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class AdminActionLogRepositoryMysqlTest {
 
@@ -179,7 +175,6 @@ class AdminActionLogRepositoryMysqlTest {
                                 assertThat(detail.actor().name()).isEqualTo("admin01");
                                 assertThat(adapter.findByBatchId("nope")).isEmpty();
 
-                                // 같은 원본을 두 번 되돌릴 수 없다(DB UNIQUE).
                                 assertThatThrownBy(
                                                 () ->
                                                         adapter.save(

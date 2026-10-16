@@ -25,7 +25,6 @@ public class AdminActionLogQueryService implements AdminActionLogQueryUseCase {
 
     @Override
     public Page<AdminActionLogSummaryResponse> getActionLogs(Pageable pageable) {
-        // 정렬은 어댑터가 발생 시각 내림차순으로 고정하므로 요청의 정렬 값은 쓰지 않고, 크기만 제한한다.
         Pageable limited =
                 PageRequest.of(
                         Math.max(pageable.getPageNumber(), 0),

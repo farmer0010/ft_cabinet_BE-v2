@@ -34,14 +34,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 
-/**
- * 지금까지 500 으로 나가던 예외들이 올바른 상태 코드로 매핑되고, 어떤 경우에도 응답 본문에 내부 정보(스택, SQL, 패키지/클래스 이름)가 담기지 않는지 확인한다.
- * Spring MVC 가 실제로 던지는 예외(깨진 JSON, 타입 불일치, 필수 파라미터·파트 누락, 지원하지 않는 Content-Type)는 standalone MockMvc
- * 의 실제 디스패치를 거치게 해서 핸들러가 정말 그 예외를 받는지 확인한다.
- */
 class GlobalExceptionHandlerMappingTest {
 
-    /** 응답 본문에 있으면 안 되는 내부 정보의 흔적. */
     private static final Pattern LEAK =
             Pattern.compile(
                     "Exception|org\\.springframework|com\\.gyeongsan|java\\.|jakarta\\.|hibernate"
@@ -152,7 +146,6 @@ class GlobalExceptionHandlerMappingTest {
         assertThat(json.path("success").asBoolean(true)).isFalse();
         assertThat(json.path("status").asInt()).isEqualTo(status);
         assertThat(json.path("message").asText()).isNotBlank();
-        // 어떤 경우에도 내부 정보가 응답에 새지 않는다.
         assertThat(body).as("응답 본문에 내부 정보가 있으면 안 된다").doesNotContainPattern(LEAK);
         return json;
     }
@@ -290,7 +283,6 @@ class GlobalExceptionHandlerMappingTest {
         JsonNode plain = expect(mvc.perform(get("/t/plain-illegal-argument")).andReturn(), 400);
         assertThat(plain.path("message").asText()).contains("되돌리기 사유(reason)는 필수입니다.");
 
-        // Enum.valueOf 의 메시지는 "No enum constant java.util.concurrent.TimeUnit.NOPE" 처럼 클래스 이름을 담는다.
         JsonNode internal = expect(mvc.perform(get("/t/enum")).andReturn(), 400);
         assertThat(internal.path("message").asText()).contains("요청 값이 올바르지 않습니다.");
     }

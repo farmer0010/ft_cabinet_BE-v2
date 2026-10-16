@@ -1,10 +1,5 @@
 package com.gyeongsan.cabinet.application.alarm;
 
-/**
- * @param channelId 감시할 슬랙 채널 ID(C... / G...)
- * @param maxPerPoll 한 번에 전달할 최대 메시지 수. 넘치면 오래된 것은 요약 한 줄로 대체한다
- * @param maxTextLength DM 에 싣는 본문 최대 길이
- */
 public record SlackReportSettings(String channelId, int maxPerPoll, int maxTextLength) {
 
     public SlackReportSettings {

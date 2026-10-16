@@ -29,17 +29,11 @@ import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.FileSystemResource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * 실제 운영 설정(src/main/resources/application.yml 의 JPA/SQL 초기화 설정)으로 Spring Boot 가 Flyway 와 JPA 를 연결해
- * 부팅하는지 확인한다. 라이브러리를 직접 호출하는 테스트로는 잡히지 않는, Boot 의 초기화 순서(depends-on) 문제를 잡기 위한 테스트다. Docker 가 없으면
- * 건너뛴다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class FlywayBootWiringTest {
 
     private static final Path MAIN_YML = Path.of("src/main/resources/application.yml");
 
-    /** 마이그레이션 대상인 admin_action_log 엔티티만 스캔한다. 다른 테이블은 이 DB 에 없다. */
     @Configuration
     @EntityScan(basePackageClasses = AdminActionLogEntity.class)
     static class EntityScanConfig {}
@@ -49,7 +43,6 @@ class FlywayBootWiringTest {
                 .withInitializer(
                         context -> {
                             try {
-                                // 운영과 같은 application.yml 을 그대로 읽는다 (가장 낮은 우선순위로 추가).
                                 for (PropertySource<?> source :
                                         new YamlPropertySourceLoader()
                                                 .load(
@@ -71,14 +64,12 @@ class FlywayBootWiringTest {
                                 HibernateJpaAutoConfiguration.class))
                 .withUserConfiguration(EntityScanConfig.class)
                 .withPropertyValues(
-                        // 운영에서 환경변수로 주입되는 값만 컨테이너 값으로 대체한다.
                         "spring.datasource.url=" + mysql.getJdbcUrl(),
                         "spring.datasource.username=" + mysql.getUsername(),
                         "spring.datasource.password=" + mysql.getPassword(),
                         "FLYWAY_ENABLED=true");
     }
 
-    /** 기존 DB 처럼 비어 있지 않은 스키마에 사람이 baseline(v1)을 찍어 둔 상태를 만든다. */
     private static void prepareBaselinedExistingSchema(MariaDbDriverMySqlContainer mysql)
             throws Exception {
         BaselinedSchema.prepare(mysql);
@@ -96,7 +87,6 @@ class FlywayBootWiringTest {
                     .run(
                             context -> {
                                 assertThat(context).hasNotFailed();
-                                // 운영과 같은 ddl-auto=validate 로 떴다는 것은 Flyway 가 먼저 테이블을 만들었다는 뜻이다.
                                 assertThat(
                                                 context.getEnvironment()
                                                         .getProperty(

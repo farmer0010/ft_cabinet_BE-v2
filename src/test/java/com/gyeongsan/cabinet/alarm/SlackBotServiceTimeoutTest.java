@@ -29,10 +29,6 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 
-/**
- * Slack DM 호출에 타임아웃이 걸려 있는지 확인한다. 타임아웃이 없던 시절({@code new RestTemplate()})에는 Slack 이 응답하지 않으면 호출
- * 스레드가 무기한 멈췄고, 스케줄러 스레드가 1개여서 모든 정기 작업이 같이 멈췄다(감사 H-9).
- */
 class SlackBotServiceTimeoutTest {
 
     private static final String TOKEN = "TEST-SLACK-TOKEN-should-not-leak-1a2b3c";
@@ -60,7 +56,6 @@ class SlackBotServiceTimeoutTest {
                     exchange.getRequestBody().readAllBytes();
                     if (hang) {
                         try {
-                            // 응답을 보내지 않고 붙잡는다(Slack 이 멈춘 상황).
                             release.await(15, TimeUnit.SECONDS);
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
@@ -120,7 +115,6 @@ class SlackBotServiceTimeoutTest {
         service.sendDm("jooyoung", "안녕하세요");
         long elapsedMs = (System.nanoTime() - start) / 1_000_000;
 
-        // 타임아웃이 없으면 서버가 붙잡는 15초 동안(또는 영원히) 막힌다.
         assertThat(elapsedMs).as("타임아웃(500ms) 안에 돌아와야 한다").isLessThan(5_000);
         assertThat(paths).as("요청은 실제로 나갔다").isNotEmpty();
         assertThat(logs()).contains("슬랙");
@@ -142,7 +136,6 @@ class SlackBotServiceTimeoutTest {
     @Test
     @DisplayName("연결을 받아 주지 않는 주소(블랙홀)에서도 연결 타임아웃 안에 끝난다")
     void connectTimeoutBoundsUnreachableHost() {
-        // 라우팅되지 않는 TEST-NET 주소. 환경에 따라 즉시 거부되거나 멈추는데, 어느 쪽이든 제한 시간 안에 끝나야 한다.
         SlackBotService service = new SlackBotService(TOKEN, "http://192.0.2.1/api", 500, 500);
 
         long start = System.nanoTime();

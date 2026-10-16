@@ -29,10 +29,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * FAQ 챗봇. CHATBOT_ENABLED=true 일 때만 켜진다. 켜도 임베딩 모델을 못 불러오면 서버는 정상 기동하고 챗봇만 "사용할 수 없음"(503)으로 남는다.
- * 잘못된 임계값이나 알 수 없는 임베딩 방식은 설정 실수이므로 부팅 시점에 실패한다.
- */
 @Configuration
 @ConditionalOnProperty(name = "app.chatbot.enabled", havingValue = "true")
 public class ChatbotConfig {
@@ -71,8 +67,6 @@ public class ChatbotConfig {
         return switch (provider) {
             case "onnx" -> {
                 Path dir = Path.of(modelDir);
-                // 모델 내려받기 스크립트가 model.properties 에 모델 id/접두어/최대 토큰을 적어 둔다.
-                // e5 처럼 접두어가 필수인 모델을 설정 누락으로 조용히 잘못 쓰지 않도록, 명시한 값이 없으면 그 파일을 따른다.
                 Properties fromFile = readModelProperties(dir);
                 String effectiveId =
                         isUnset(modelId) ? fromFile.getProperty("modelId", "unknown") : modelId;
@@ -102,7 +96,6 @@ public class ChatbotConfig {
         };
     }
 
-    /** 모델이 쓰는 네이티브 메모리까지 보려고 프로세스 RSS 를 지표로 노출한다(챗봇이 켜졌을 때만). */
     @Bean
     public ProcessRssMetrics chatbotProcessRssMetrics() {
         return new ProcessRssMetrics();
@@ -126,7 +119,6 @@ public class ChatbotConfig {
             ChatbotMetricsPort metrics,
             ChatbotSettings settings,
             ObjectProvider<PersonalIntentRouter> personalRouter) {
-        // 개인화가 꺼져 있으면 라우터 빈이 없고, 칩 제안 없이 기존 FAQ 동작 그대로다.
         return new ChatbotService(
                 indexManager,
                 chatbotEmbeddingPort,
@@ -159,7 +151,6 @@ public class ChatbotConfig {
         }
     }
 
-    /** 파일이 없거나 읽을 수 없으면 빈 값을 돌려준다(모델이 아직 없어도 서버는 떠야 한다). */
     private static Properties readModelProperties(Path dir) {
         Properties properties = new Properties();
         Path file = dir.resolve("model.properties");

@@ -66,7 +66,6 @@ class LentTicketRewardPolicyTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new LentTicketRewardPolicy(900, 4800))
                 .isInstanceOf(IllegalArgumentException.class);
-        // 같은 값은 허용(트센 혜택 없음)
         assertThat(new LentTicketRewardPolicy(900, 900).thresholdMinutesFor(user(null, false)))
                 .isEqualTo(900);
     }

@@ -5,7 +5,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-/** CORS 허용 origin = 설정(app.cors.allowed-origins) + 프론트 URL 의 origin. 코드에 상수를 두지 않는다. */
 public final class AllowedOrigins {
 
     private AllowedOrigins() {}

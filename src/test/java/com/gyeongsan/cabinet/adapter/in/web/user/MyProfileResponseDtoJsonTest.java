@@ -36,7 +36,6 @@ class MyProfileResponseDtoJsonTest {
                             assertThat(transcender.get("isTranscender").isBoolean()).isTrue();
                             assertThat(transcender.get("isTranscender").asBoolean()).isTrue();
                             assertThat(general.get("isTranscender").asBoolean()).isFalse();
-                            // 키가 중복으로 나가지 않는다.
                             assertThat(transcender.has("transcender")).isFalse();
                         });
     }

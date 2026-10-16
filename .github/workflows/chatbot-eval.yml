@@ -1,13 +1,5 @@
 name: 🤖 챗봇 모델 평가 / 고정
 
-# 챗봇 임베딩 모델(후보였던 minilm 은 폐기, 현재는 e5)을 Hugging Face 에서 내려받아 평가 질문 세트로 비교하고,
-# lock 파일(chatbot-models.lock)에 고정할 revision/SHA256 을 출력한다. 수동 실행 전용이다.
-#
-#  1) 이 작업을 실행한다 → 요약(Job summary)에 구현 정합성(Java vs 정답 벡터), 모델별 정확도 표,
-#     "lock 파일에 고정할 값"이 나온다. 기본은 기준을 적용하지 않아(enforce=false) 표만 보고 빨간불이 뜨지 않는다.
-#  2) 더 나은 모델을 고르고, 출력된 meta/file 줄로 chatbot-models.lock 을 고쳐 커밋한다.
-#  3) 표의 임계값 후보를 보고 CHATBOT_MATCH_THRESHOLD 등을 정한다.
-# 이 작업은 운영 비밀을 쓰지 않는다(공개 모델 다운로드만).
 
 on:
   workflow_dispatch:
@@ -45,7 +37,6 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      # 정답 벡터를 만드는 파이썬 참조 구현(sentence-transformers, CPU). Java 어댑터와 구현이 겹치지 않는 기준이다.
       - name: 🐍 Set up Python
         uses: actions/setup-python@v5
         with:
@@ -57,8 +48,6 @@ jobs:
           python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
           python -m pip install sentence-transformers
 
-      # resolve 모드: PENDING 인 revision 은 현재 커밋으로 풀고, SHA256 은 계산해서 출력한다.
-      # 이미 고정된 값이 있으면 그 값과 다를 때 실패한다.
       - name: 📦 모델 내려받기 (resolve)
         env:
           MODELS: ${{ inputs.models }}
@@ -73,7 +62,6 @@ jobs:
             echo >> build/chatbot-models/pin.txt
           done
 
-      # 같은 모델 저장소의 원본 가중치로 정답 벡터를 만든다(모델 파일이 아니라 저장소 revision 기준).
       - name: 🎯 정답 벡터 생성
         env:
           MODELS: ${{ inputs.models }}
@@ -94,7 +82,6 @@ jobs:
           chmod +x gradlew
           ./gradlew test --tests '*ChatbotGoldenVectorTest' --tests '*ChatbotRetrievalEvaluationTest' --tests '*ChatbotPersonalEvaluationTest' -x jacocoTestCoverageVerification --no-daemon -i
 
-      # 메모리·지연 참고치: 러너 CPU 를 2코어로 제한해(Azure B2 와 같은 코어 수) 같은 설정으로 잰다. 서버 실측은 아니다.
       - name: 📏 메모리·지연 측정 (2코어 제한)
         env:
           CHATBOT_EVAL_MODELS_DIR: ${{ github.workspace }}/build/chatbot-models

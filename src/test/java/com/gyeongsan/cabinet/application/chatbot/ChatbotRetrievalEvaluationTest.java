@@ -28,25 +28,6 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * FAQ 의미 검색의 품질 평가. FAQ 질문 표현(faq-seed.json)으로 색인을 만들고, 다르게 표현한 질문이 올바른 FAQ 를 찾는지, 범위 밖 질문을 잘 거르는지를
- * 측정한다.
- *
- * <p>평가 질문은 두 벌이다.
- *
- * <ul>
- *   <li>개발 세트(eval-set.json): 임계값, margin 규칙, FAQ 변형 보강을 조정할 때 보는 세트. 통과/실패 기준도 이 세트에 건다.
- *   <li>보류 세트(eval-holdout.json): FAQ 변형과도, 개발 세트와도 겹치지 않게 따로 쓴 세트. <b>보고용이다. 이 결과를 보고 FAQ 변형이나
- *       임계값을 고치면 보류 세트의 의미가 사라진다.</b>
- * </ul>
- *
- * <p>주의: 두 세트 모두 FAQ 를 쓴 사람과 같은 저자가 만들었고 실제 학생 질문이 아니다(질문 원문을 수집하지 않는 설계). 그래서 실제 분포보다 수치가 높게 나올 수
- * 있다. 어디까지나 모델과 설정을 비교하는 상대 지표로 읽어야 한다.
- *
- * <p>환경변수: CHATBOT_EVAL_MODELS_DIR(하위 디렉터리마다 model.onnx, tokenizer.json, model.properties),
- * CHATBOT_EVAL_MIN_TOP1(기본 0.80), CHATBOT_EVAL_ENFORCE(기본 true, false 면 기준 미달이어도 실패시키지 않고 리포트만
- * 남긴다). 결과는 build/chatbot-eval/report.md.
- */
 class ChatbotRetrievalEvaluationTest {
 
     record Candidate(String id, EmbeddingPort port, boolean required) {}
@@ -185,7 +166,6 @@ class ChatbotRetrievalEvaluationTest {
                     ChatbotEvalSupport.rows(result, fine));
         }
 
-        // 점수와 margin 이 "정답을 가려내는 신호"인지
         List<Probe> right = result.in().stream().filter(Probe::top1).toList();
         List<Probe> wrong = result.in().stream().filter(p -> !p.top1()).toList();
         sb.append("신호 품질(0.5 = 구분 못 함, 1.0 = 완벽)\n\n");
@@ -222,7 +202,6 @@ class ChatbotRetrievalEvaluationTest {
                         "%n- 범위 안 vs 범위 밖 구분력(1위 유사도 AUROC): %s%n%n",
                         num(ChatbotEvalSupport.auroc(inScores, outScores))));
 
-        // 자동 답변 규칙: 점수 ≥ T 그리고 margin ≥ M
         List<Double> ts = ChatbotEvalSupport.oosQuantileThresholds(result);
         if (!ts.isEmpty()) {
             double[] ms = {0, 0.01, 0.02, 0.03, 0.05};
@@ -320,7 +299,6 @@ class ChatbotRetrievalEvaluationTest {
         sb.append('\n');
     }
 
-    /** 두 세트에서 같은 (T, M) 칸을 나란히 본다. 자동 답변 규칙은 이 표로 고른다. */
     private static String commonGrid(String candidateId, SetResult dev, SetResult holdout) {
         StringBuilder sb = new StringBuilder();
         sb.append(String.format(Locale.ROOT, "#### %s — 공통 격자(같은 T, M)%n%n", candidateId));
@@ -417,13 +395,10 @@ class ChatbotRetrievalEvaluationTest {
         assertThat(holdout.inScope()).hasSizeGreaterThanOrEqualTo(100);
         assertThat(holdout.outOfScope()).hasSizeGreaterThanOrEqualTo(25);
 
-        // 평가 질문이 가리키는 FAQ 가 실제로 있어야 한다.
         List<String> keys = faqs.stream().map(SeedFaq::seedKey).toList();
         for (EvalSet set : List.of(dev, holdout)) {
             assertThat(set.inScope()).allSatisfy(i -> assertThat(keys).containsAll(i.accepted()));
         }
-        // 평가 질문이 색인된 FAQ 질문 표현과 글자 그대로 같으면 평가가 아니라 암기다.
-        // 보류 세트는 개발 세트와도 겹치면 안 된다(개발 세트를 보고 변형을 쓰게 되면 보류 세트가 오염된다).
         Set<String> indexed = new LinkedHashSet<>();
         faqs.forEach(f -> indexed.addAll(f.questions()));
         Set<String> devQuestions = new LinkedHashSet<>();
@@ -470,7 +445,6 @@ class ChatbotRetrievalEvaluationTest {
                 report.append(report(candidate.id(), candidate.required(), "개발 세트", devResult));
                 report.append(
                         report(candidate.id(), candidate.required(), "보류 세트(보고용)", holdoutResult));
-                // 자동 답변 규칙(T, M)은 두 세트의 같은 칸을 나란히 보고 고른다.
                 report.append(commonGrid(candidate.id(), devResult, holdoutResult));
                 if (candidate.required()) {
                     report.append(
@@ -502,7 +476,6 @@ class ChatbotRetrievalEvaluationTest {
             }
         }
 
-        // 공통 격자가 리포트에 실제로 들어갔는지(함수만 만들고 호출을 빠뜨리는 일을 막는다).
         assertThat(report.toString()).contains("공통 격자(같은 T, M)").contains("합산(개발+보류)");
 
         Path out = Path.of("build/chatbot-eval/report.md");
@@ -515,10 +488,6 @@ class ChatbotRetrievalEvaluationTest {
         }
     }
 
-    /**
-     * FAQ 변형이 평가 질문을 거의 베낀 것이 아닌지 확인한다. 글자가 완전히 같은지는 evaluate() 가 막고, 여기서는 같은 FAQ 를 가리키는 평가 질문과 글자
-     * 겹침이 매우 큰(어순·조사만 바꾼) 변형을 막는다. 다른 FAQ 의 질문끼리 틀(예: "~는 어디서 하나요")을 공유하는 것은 정상이라 보지 않는다.
-     */
     @Test
     @DisplayName("FAQ 변형이 같은 FAQ 를 가리키는 평가 질문의 거의 복사본이면 실패한다")
     void variantsAreNotNearCopiesOfEvalQuestions() throws Exception {

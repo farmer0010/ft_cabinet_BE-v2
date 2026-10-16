@@ -8,7 +8,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
-/** 계정 연동용 redirect URI 는 프론트가 콜백을 받는 경로이므로 FRONTEND_URL 에서 파생한다. */
 @Component
 public class FrontendLinkRedirectUriAdapter implements LinkRedirectUriPort {
 

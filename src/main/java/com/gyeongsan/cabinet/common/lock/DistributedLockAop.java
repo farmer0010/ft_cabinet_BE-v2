@@ -32,7 +32,6 @@ import org.springframework.stereotype.Component;
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
 public class DistributedLockAop {
 
-    /** 값이 내 토큰일 때만 지운다. 확인과 삭제가 한 번에 일어나야 해서 Lua 로 실행한다(키가 하나라 클러스터에서도 동작). */
     private static final RedisScript<Long> RELEASE_SCRIPT =
             new DefaultRedisScript<>(
                     "if redis.call('GET', KEYS[1]) == ARGV[1] then"
@@ -73,7 +72,6 @@ public class DistributedLockAop {
         long waitTime = distributedLock.waitTime();
         long leaseTime = distributedLock.leaseTime();
 
-        // 락을 잡은 요청만 아는 값. lease 가 만료돼 다른 요청이 같은 키를 잡았을 때, 먼저 끝난 요청이 남의 락을 지우지 않게 한다.
         String token = UUID.randomUUID().toString();
         long startTime = System.currentTimeMillis();
         boolean isLocked = false;
@@ -104,7 +102,6 @@ public class DistributedLockAop {
         }
     }
 
-    /** 내 락일 때만 해제한다. 해제 실패가 이미 끝난 업무 결과를 덮어쓰지 않도록 예외는 삼키고 기록만 한다(락은 lease 로 만료된다). */
     private void release(String key, String token, long leaseTime) {
         try {
             Long deleted = redisTemplate.execute(RELEASE_SCRIPT, List.of(key), token);

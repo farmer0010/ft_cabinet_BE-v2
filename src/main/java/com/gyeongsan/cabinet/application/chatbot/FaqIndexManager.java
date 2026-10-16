@@ -14,12 +14,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.log4j.Log4j2;
 
-/**
- * FAQ 를 DB 에서 읽어 임베딩을 계산하고 검색 색인을 만든다. 임베딩은 DB 에 저장하지 않고 메모리에서만 계산한다(수백 건이라 몇 초면 끝난다).
- *
- * <p>서버마다 각자 색인을 갖는다. 관리자가 FAQ 를 바꾸면 그 서버는 바로 다시 만들고, 다른 서버는 주기적으로 DB 의 변경 여부(fingerprint)를 보고 다시
- * 만든다. 모델을 쓸 수 없으면 준비되지 않은 상태로 남고 다음 주기에 다시 시도한다. 서버 기동이나 다른 기능은 막지 않는다.
- */
 @Log4j2
 public class FaqIndexManager {
 
@@ -55,7 +49,6 @@ public class FaqIndexManager {
         return index;
     }
 
-    /** 비동기로 색인을 (다시) 만든다. 기동 직후나 관리자가 FAQ 를 바꾼 직후에 쓴다. 이미 대기 중인 요청이 있으면 합친다. */
     public void requestRebuild() {
         if (queued.compareAndSet(false, true)) {
             executor.submit(
@@ -66,10 +59,6 @@ public class FaqIndexManager {
         }
     }
 
-    /**
-     * 준비가 안 됐거나 DB 의 FAQ 가 바뀌었으면 다시 만들도록 요청한다. 주기적으로 호출한다. 확인은 가볍게(DB 한 번) 하고, 오래 걸리는 계산은 별도 스레드에서
-     * 하므로 공용 스케줄러 스레드를 막지 않는다.
-     */
     public void refreshIfChanged() {
         try {
             if (!ready || !faqRepository.fingerprint().equals(builtFingerprint)) {
@@ -93,15 +82,12 @@ public class FaqIndexManager {
         }
     }
 
-    /** 동기 방식으로 색인을 만든다(테스트와 내부용). */
     @SuppressWarnings("UnusedReturnValue")
     public void rebuild() {
         buildLock.lock();
         try {
-            // 읽기 전에 fingerprint 를 먼저 잡아야, 만드는 중에 바뀐 내용이 다음 주기에 반영된다.
             String fingerprint = faqRepository.fingerprint();
 
-            // 모델을 미리 읽어 두어 첫 사용자 요청이 느려지지 않게 하고, 모델 문제를 여기서 드러낸다.
             embedding.embed(WARMUP_TEXT);
 
             List<Faq> faqs = faqRepository.findAllEnabled();

@@ -22,10 +22,6 @@ import org.springframework.boot.convert.DurationStyle;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * 슬랙 공지 → 카카오톡 전달. SLACK_NOTICE_FORWARD_ENABLED=true 일 때만 켜지고(기본 꺼짐) 채널 ID 가 없으면 부팅이 실패한다. 카카오
- * 알림(KAKAO_NOTIFY_ENABLED)이 꺼져 있는데 켜면 "조용히 아무것도 안 보내는" 상태가 되지 않도록 부팅을 실패시킨다.
- */
 @Log4j2
 @Configuration
 @ConditionalOnProperty(name = "app.slack-notice.enabled", havingValue = "true")
@@ -42,10 +38,6 @@ public class SlackNoticeConfig {
                 channelId.trim(), maxPerPoll, maxHoldHours, linkUrl.trim(), permalinkEnabled);
     }
 
-    /**
-     * 긴 공지 요약기. 꺼져 있거나(기본) API 키가 없으면 요약을 쓰지 않는 구현을 쓴다 — 키가 없어도 부팅은 막지 않고 경고만 남긴다(공지 전달 자체가 우선). 키는
-     * 로그·예외에 남기지 않는다.
-     */
     @Bean
     public NoticeSummarizerPort noticeSummarizerPort(
             @Value("${app.slack-notice.summary.enabled:false}") boolean enabled,
@@ -70,7 +62,6 @@ public class SlackNoticeConfig {
                     "[SlackNotice] SLACK_NOTICE_SUMMARY_ENABLED=true 이지만 GEMINI_API_KEY 가 없어 긴 공지 요약을 쓰지 않고 자르기로 대체합니다.");
             return NoticeSummarizerPort.disabled();
         }
-        // "8s", "10m" 같은 표기를 읽는다(@Value 의 Duration 자동 변환은 Boot 의 변환 서비스가 있어야 해서 직접 파싱한다).
         Duration timeout = DurationStyle.detectAndParse(timeoutText.trim());
         Duration waitInOpenState = DurationStyle.detectAndParse(waitInOpenStateText.trim());
         CircuitBreaker circuitBreaker =
@@ -107,8 +98,6 @@ public class SlackNoticeConfig {
             throw new IllegalStateException(
                     "SLACK_NOTICE_FORWARD_ENABLED=true 이면 KAKAO_NOTIFY_ENABLED=true(와 KAKAO_TOKEN_ENC_KEY)도 필요합니다.");
         }
-        // revoked_at 같은 LocalDateTime 기록이 동의 등록(consented_at)과 같은 시간대(서버 기본 Asia/Seoul)로 찍히도록
-        // UTC 가 아니라 기본 시간대 시계를 쓴다.
         return new SlackNoticeForwardService(
                 channelPort,
                 cursorPort,

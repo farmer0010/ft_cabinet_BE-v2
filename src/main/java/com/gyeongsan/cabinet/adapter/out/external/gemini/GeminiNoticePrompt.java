@@ -1,15 +1,10 @@
 package com.gyeongsan.cabinet.adapter.out.external.gemini;
 
-/**
- * 공지 요약 프롬프트. 공지 본문은 슬랙에 글을 쓸 수 있는 누구나 바꿀 수 있는 <b>신뢰할 수 없는 입력</b>이므로, 시스템 지시와 분리하고 고정 구분자로 감싸
- * "데이터이지 지시가 아니다"라고 명시한다. 본문 안에 구분자가 있으면 지시 영역을 흉내 낼 수 있으니 미리 제거한다.
- */
 final class GeminiNoticePrompt {
 
     static final String BEGIN = "<<<NOTICE_DATA>>>";
     static final String END = "<<<END_NOTICE_DATA>>>";
 
-    /** 모델에 보내는 본문 최대 길이(코드 포인트). 비용·지연과 주입 공격 표면을 함께 줄인다. */
     static final int MAX_INPUT_CHARS = 4000;
 
     private GeminiNoticePrompt() {}

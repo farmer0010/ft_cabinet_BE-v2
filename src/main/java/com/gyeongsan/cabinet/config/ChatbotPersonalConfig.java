@@ -24,10 +24,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 
-/**
- * 챗봇의 "내 정보" 답변. CHATBOT_ENABLED 와 CHATBOT_PERSONAL_ENABLED 가 모두 true 일 때만 켜진다(기본 꺼짐). 질문 표현 목록이
- * 잘못됐으면(모르는 인텐트, 빈 목록) 설정 실수이므로 부팅 시점에 실패한다.
- */
 @Configuration
 @ConditionalOnProperty(
         name = {"app.chatbot.enabled", "app.chatbot.personal.enabled"},
@@ -42,7 +38,6 @@ public class ChatbotPersonalConfig {
         return new PersonalIntentRouter(loadCatalog(), chatbotEmbeddingPort);
     }
 
-    /** 사용자별 분당 한도. 서버 메모리 기준이라 서버가 여러 대면 서버별로 적용된다. */
     @Bean
     public PerUserRateLimiter personalRateLimiter(
             @Value("${app.chatbot.personal.rate-limit-per-minute:10}") int perMinute) {

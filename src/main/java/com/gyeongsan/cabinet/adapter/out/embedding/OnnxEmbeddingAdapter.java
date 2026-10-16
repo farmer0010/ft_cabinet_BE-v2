@@ -16,13 +16,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * 서버 안에서 ONNX 모델로 문장 임베딩을 계산한다(외부 API 호출 없음, 질문이 서버 밖으로 나가지 않는다).
- *
- * <p>sentence-transformers 계열 모델의 ONNX 내보내기를 가정한다. 입력은 input_ids, attention_mask(,
- * token_type_ids)이고, 출력은 토큰별 은닉 상태 (평균 풀링한다)이거나 이미 풀링된 sentence_embedding 이다. 어느 쪽이든 마지막에 길이 1로
- * 정규화한다. 모델이 e5 계열이면 prefix 로 "query: "를 준다.
- */
 public class OnnxEmbeddingAdapter implements EmbeddingPort, AutoCloseable {
 
     static final String INPUT_IDS = "input_ids";
@@ -108,7 +101,6 @@ public class OnnxEmbeddingAdapter implements EmbeddingPort, AutoCloseable {
                         ATTENTION_MASK, OnnxTensor.createTensor(environment, new long[][] {mask}));
             }
             if (inputNames.contains(TOKEN_TYPE_IDS)) {
-                // 한 문장만 넣으므로 모두 0 이다.
                 inputs.put(
                         TOKEN_TYPE_IDS,
                         OnnxTensor.createTensor(environment, new long[][] {new long[ids.length]}));
@@ -149,7 +141,6 @@ public class OnnxEmbeddingAdapter implements EmbeddingPort, AutoCloseable {
                 session.close();
             }
         } catch (OrtException ignored) {
-            // 종료 중 오류는 무시한다.
         }
         if (tokenizer != null) {
             tokenizer.close();

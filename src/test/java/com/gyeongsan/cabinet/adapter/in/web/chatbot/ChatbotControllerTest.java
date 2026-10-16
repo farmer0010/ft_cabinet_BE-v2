@@ -94,7 +94,6 @@ class ChatbotControllerTest {
                 .andExpect(jsonPath("$.data.answer.question").value("대여 방법"))
                 .andExpect(jsonPath("$.data.answer.answer").value("대여 답변"))
                 .andExpect(jsonPath("$.data.suggestions").isEmpty())
-                // 유사도 점수 같은 내부 값은 노출하지 않는다.
                 .andExpect(jsonPath("$.data.score").doesNotExist());
     }
 

@@ -31,11 +31,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.WebApplicationContext;
 
-/**
- * 운영 프로필에서 Swagger UI 와 OpenAPI JSON 이 실제로 사라지는지 확인한다. 운영 설정 파일(application.yml +
- * application-prod.yml)을 그대로 읽어 springdoc 자동구성에 적용하고, 실제 MockMvc 요청으로 상태 코드를 본다. 설정 파일 문자열만 검사하면
- * springdoc 프로퍼티 이름이 틀려도 통과하기 때문에 동작으로 검증한다.
- */
 class SwaggerProdDisabledTest {
 
     private static final Path MAIN_YML = Path.of("src/main/resources/application.yml");
@@ -76,7 +71,6 @@ class SwaggerProdDisabledTest {
                 .withInitializer(
                         context -> {
                             try {
-                                // 프로필 설정이 기본 설정보다 우선하도록 먼저 넣는다.
                                 if (prodProfile) {
                                     for (PropertySource<?> source :
                                             new YamlPropertySourceLoader()
@@ -138,7 +132,6 @@ class SwaggerProdDisabledTest {
                             mvc.perform(get("/swagger-ui.html")).andExpect(status().isNotFound());
                             mvc.perform(get("/swagger-ui/index.html"))
                                     .andExpect(status().isNotFound());
-                            // 일반 API 는 그대로 동작한다.
                             mvc.perform(get("/v4/ping")).andExpect(status().isOk());
 
                             assertThat(context)

@@ -8,7 +8,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** 일정 간격으로 오류제보 채널을 확인한다. 서버가 여러 대여도 ShedLock 으로 한 곳에서만 실행된다. */
 @Component
 @ConditionalOnProperty(name = "app.slack-report.enabled", havingValue = "true")
 @RequiredArgsConstructor
@@ -28,7 +27,6 @@ public class SlackReportScheduler {
         try {
             forwardSlackReports.forwardNewReports();
         } catch (RuntimeException e) {
-            // 스케줄러 스레드가 예외로 죽지 않게 하고, 다음 주기에 다시 시도한다.
             log.error("[SlackReport] 전달 중 예상치 못한 오류: {}", e.toString(), e);
         }
     }

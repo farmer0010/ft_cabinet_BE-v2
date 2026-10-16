@@ -14,7 +14,6 @@ spring:
       ddl-auto: create-drop
     defer-datasource-initialization: true
   
-  # Disable other external dependencies for tests
   data:
     redis:
       host: localhost
@@ -70,7 +69,6 @@ slack:
 
 app:
   redis:
-    # 테스트는 로컬 Redis(비밀번호 없음)를 쓴다. 운영 설정은 이 플래그 없이는 부팅하지 않는다.
     allow-insecure: true
   frontend:
     url: http://localhost:3000

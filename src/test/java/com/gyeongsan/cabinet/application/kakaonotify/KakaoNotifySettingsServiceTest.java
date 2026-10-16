@@ -43,7 +43,7 @@ class KakaoNotifySettingsServiceTest {
         KakaoNotifyStatus off = service.setAlarm(1L, false);
         assertThat(user.isKakaoAlarm()).isFalse();
         assertThat(off.receiving()).isFalse();
-        assertThat(off.consented()).isTrue(); // 동의는 남아 있고 스위치만 꺼짐
+        assertThat(off.consented()).isTrue();
         verify(users, org.mockito.Mockito.times(2)).save(user);
     }
 

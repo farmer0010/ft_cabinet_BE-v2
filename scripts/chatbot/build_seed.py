@@ -557,7 +557,7 @@ def main() -> None:
     review += ["", "## 검토표", "",
                "| # | 분류 | seedKey | 대표 질문 | 변형 수 | 근거(코드/설정) | 확인 필요 |", "|---|---|---|---|---|---|---|"]
     for i, f in enumerate(FAQS, 1):
-        assert 6 <= len(f["questions"]) <= 10, f["key"]  # 서비스 한도(FaqAdminService.MAX_QUESTIONS_PER_FAQ)와 같다
+        assert 6 <= len(f["questions"]) <= 10, f["key"]
         assert len(set(f["questions"])) == len(f["questions"]), f["key"]
         seed.append({"seedKey": f["key"], "category": f["category"], "answer": f["answer"], "enabled": True,
                      "questions": f["questions"]})

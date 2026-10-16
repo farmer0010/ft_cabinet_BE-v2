@@ -23,16 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 로그인한 본인의 정보로 답하는 개인화 챗봇. 지켜야 할 규칙:
- *
- * <ul>
- *   <li>대상은 인자로 받은 userId(인증 정보에서 얻은 값) 하나뿐이다. 질문 문장이나 요청 값으로 대상을 바꿀 수 없다.
- *   <li>읽기 전용이다(락도, 상태 변경도 없다). 대여 흐름과 락 경합하지 않는다.
- *   <li>인텐트마다 필요한 값만 읽고 {@link PersonalFacts} 의 화이트리스트로만 내보낸다.
- *   <li>값은 로그에 남기지 않는다(예외 메시지에도 넣지 않는다).
- * </ul>
- */
 @Transactional(readOnly = true)
 public class PersonalChatbotService implements PersonalChatbotUseCase {
 
@@ -98,7 +88,6 @@ public class PersonalChatbotService implements PersonalChatbotUseCase {
                 PersonalIntent.LENT_EXPIRY, PersonalAnswerTemplates.lentExpiry(facts), facts);
     }
 
-    /** `/me` 와 같은 계산(달력 날짜 기준 남은 일수, 만료 시각 기준 overdue)을 쓴다. */
     private static PersonalFacts.LentExpiry expiryOf(LentHistory lent, LocalDateTime now) {
         return new PersonalFacts.LentExpiry(
                 true,
@@ -132,10 +121,6 @@ public class PersonalChatbotService implements PersonalChatbotUseCase {
                 facts);
     }
 
-    /**
-     * 사용자 조건으로 대여가 막히는 사유. {@code startLent} 의 사용자 단위 검사(패널티, 이미 대여 중, 대여권)만 본다. 사물함 단위 사유(남의 예약,
-     * 사물함 상태)는 특정 사물함을 지정해야 알 수 있고 다른 사람의 정보가 새어 나갈 수 있어 판단하지 않는다.
-     */
     private PersonalAnswer blockers(User user, LocalDate today) {
         List<Blocker> blockers = new ArrayList<>();
         int penaltyDays = penaltyDaysOf(user);

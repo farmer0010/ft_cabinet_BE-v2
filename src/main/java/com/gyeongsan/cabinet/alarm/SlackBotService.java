@@ -28,10 +28,6 @@ public class SlackBotService {
     private final RestTemplate restTemplate;
     private final Map<String, String> slackUserIdMap = new ConcurrentHashMap<>();
 
-    /**
-     * 연결/읽기 타임아웃을 반드시 둔다. 타임아웃이 없는 {@code new RestTemplate()} 은 Slack 응답이 멈추면 호출 스레드를 무기한 붙잡았고,
-     * 스케줄러 스레드에서 호출되면 모든 {@code @Scheduled} 작업이 함께 멈췄다(감사 H-9). 0 이하는 JDK 에서 "무제한"을 뜻하므로 허용하지 않는다.
-     */
     public SlackBotService(
             @Value("${slack.token}") String botToken,
             @Value("${slack.api-base-url:https://slack.com/api}") String apiBaseUrl,

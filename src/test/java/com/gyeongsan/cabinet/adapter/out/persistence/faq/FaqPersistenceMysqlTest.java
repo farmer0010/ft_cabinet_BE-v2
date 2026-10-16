@@ -28,10 +28,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * 실제 MySQL(운영 8.0, 테스트 8.4)에서 Flyway V5 와 엔티티 매핑(validate), 어댑터 동작, 검색 흐름 전체를 확인한다. Docker 가 없으면
- * 건너뛴다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class FaqPersistenceMysqlTest {
 
@@ -106,7 +102,6 @@ class FaqPersistenceMysqlTest {
                                         .containsExactly("사물함 대여 방법", "사물함 빌리는 법", "대여권이 없어요");
                                 assertThat(loaded.seedKey()).isEqualTo("seed-1");
 
-                                // 수정: 질문 표현을 교체하고(순서 포함) 시각이 갱신된다
                                 String beforeUpdate = adapter.fingerprint();
                                 Thread.sleep(5);
                                 Faq updated =
@@ -125,14 +120,12 @@ class FaqPersistenceMysqlTest {
                                 assertThat(updated.updatedAt()).isAfter(saved.updatedAt());
                                 assertThat(adapter.fingerprint()).isNotEqualTo(beforeUpdate);
 
-                                // 사용 중 필터
                                 adapter.save(faq(null, "연장", "연장 답", true, "연장 방법"));
                                 assertThat(adapter.findAll()).hasSize(2);
                                 assertThat(adapter.findAllEnabled())
                                         .extracting(Faq::category)
                                         .containsExactly("연장");
 
-                                // 시드 키는 유일하다(여러 서버가 동시에 시드해도 하나만 들어간다)
                                 assertThatThrownBy(
                                                 () ->
                                                         adapter.save(
@@ -140,11 +133,9 @@ class FaqPersistenceMysqlTest {
                                                                         "seed-1", "중복", "x", true,
                                                                         "q")))
                                         .isInstanceOf(Exception.class);
-                                // 시드 키가 없는 항목은 여러 개 가능
                                 adapter.save(faq(null, "기타", "y", true, "z"));
                                 assertThat(adapter.count()).isEqualTo(3);
 
-                                // 삭제: 질문도 함께 사라진다(고아 행 없음)
                                 assertThat(adapter.deleteById(saved.id())).isTrue();
                                 assertThat(adapter.deleteById(saved.id())).isFalse();
                                 assertThat(adapter.findById(saved.id())).isEmpty();
@@ -185,7 +176,6 @@ class FaqPersistenceMysqlTest {
                                 assertThat(found.result()).isEqualTo(ChatbotAnswer.Result.MATCHED);
                                 assertThat(found.faq().answer()).isEqualTo("반납은 이렇게 합니다");
 
-                                // 관리자가 답변을 고치고 새 FAQ 를 추가하면, 변경 감지 후 색인이 갱신된다
                                 Faq returnFaq = found.faq();
                                 adapter.save(
                                         new Faq(

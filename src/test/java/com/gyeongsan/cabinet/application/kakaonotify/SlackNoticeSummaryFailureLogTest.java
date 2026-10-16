@@ -30,10 +30,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
-/**
- * 실제 Gemini 어댑터가 오류를 내는 경로(로컬 가짜 서버)를 서비스까지 이어서, 실패 로그에 원인(응답 상태)은 남고 응답 본문·API 키·요청 URL·헤더는 남지 않는지
- * 확인한다.
- */
 class SlackNoticeSummaryFailureLogTest {
 
     private static final String API_KEY = "TEST-KEY-should-never-leak-9f8e7d";
@@ -79,7 +75,6 @@ class SlackNoticeSummaryFailureLogTest {
                         exchange.sendResponseHeaders(status, out.length);
                         exchange.getResponseBody().write(out);
                     } catch (IOException ignored) {
-                        // 클라이언트가 먼저 끊은 경우
                     } finally {
                         exchange.close();
                     }

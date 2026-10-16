@@ -21,7 +21,6 @@ public class KakaoNotifySettingsService implements KakaoNotifySettingsUseCase {
         return consentRepository.findStatus(userId);
     }
 
-    /** 유저 행을 잠그고 바꾼다(다른 유저 갱신과 같은 순서, 동시 요청도 한 줄씩). */
     @Override
     @Transactional
     public KakaoNotifyStatus setAlarm(Long userId, boolean enabled) {

@@ -8,7 +8,6 @@ import org.springframework.data.repository.query.Param;
 
 public interface FaqJpaRepository extends JpaRepository<FaqEntity, Long> {
 
-    // 질문 표현까지 한 번에 가져와 N+1 을 피한다.
     @Query("SELECT DISTINCT f FROM FaqEntity f LEFT JOIN FETCH f.questions ORDER BY f.id")
     List<FaqEntity> findAllWithQuestions();
 

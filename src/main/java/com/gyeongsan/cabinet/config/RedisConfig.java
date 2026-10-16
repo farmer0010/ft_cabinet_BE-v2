@@ -30,7 +30,6 @@ public class RedisConfig {
     @Value("${spring.data.redis.ssl.enabled:false}")
     private boolean sslEnabled;
 
-    /** 로컬/테스트에서 비인증·비암호화 연결을 쓰겠다는 명시적 선언. 기본 false, prod 프로필에서는 켤 수 없다. */
     @Value("${app.redis.allow-insecure:false}")
     private boolean allowInsecure;
 
@@ -42,7 +41,6 @@ public class RedisConfig {
 
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
-        // 비밀번호/TLS 가 없으면 여기서 부팅을 실패시킨다(프로필이 바뀌어 인증 없는 연결이 되는 것을 막는다).
         boolean insecure =
                 RedisConnectionPolicy.validate(
                         host,

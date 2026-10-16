@@ -212,8 +212,6 @@ class PersonalChatbotControllerTest {
                 .andExpect(jsonPath("$.data[0].label").value("내 사물함 만료일 확인"));
     }
 
-    // ---- 구조로 못 박는 보안 규칙 ----
-
     @Test
     @DisplayName("요청으로 받을 수 있는 값은 인텐트 이름 하나뿐이다(대상 사용자를 지정하는 필드가 없다)")
     void requestHasOnlyIntent() {

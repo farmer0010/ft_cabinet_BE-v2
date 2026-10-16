@@ -25,7 +25,6 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/** 42 로그인 시 본과정 grade 를 읽어 USER.FT_GRADE 로 저장/갱신하는 흐름. */
 class CustomOAuth2UserServiceGradeTest {
 
     private UserRepository userRepository;

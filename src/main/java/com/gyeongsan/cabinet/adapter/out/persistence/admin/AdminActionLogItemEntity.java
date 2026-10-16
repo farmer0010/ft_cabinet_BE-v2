@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** 테이블 정의는 db/migration/V2__create_admin_action_log.sql 이 단일 출처이며, 이름은 거기와 같게 유지한다. */
 @Entity
 @Table(
         name = "ADMIN_ACTION_LOG_ITEM",

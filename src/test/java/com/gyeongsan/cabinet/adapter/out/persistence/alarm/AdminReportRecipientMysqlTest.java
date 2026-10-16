@@ -25,10 +25,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * 실제 MySQL 8.0/8.4 에서 수신자 쿼리를 확인한다: ADMIN·MASTER 만, 탈퇴한 유저와 일반 유저·이용 정지 유저는 제외. 스키마는 운영과 같은
- * Flyway(V1~V5)로 만든다.
- */
 @Testcontainers(disabledWithoutDocker = true)
 class AdminReportRecipientMysqlTest {
 

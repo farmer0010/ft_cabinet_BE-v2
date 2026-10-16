@@ -1,15 +1,4 @@
 #!/usr/bin/env bash
-# 챗봇 임베딩 모델(ONNX + 토크나이저)을 내려받아 SHA256 으로 검증한다.
-#
-#   scripts/chatbot/fetch-model.sh --id e5 --out build/chatbot-model/e5 [--mode strict|resolve]
-#
-# strict (기본, Docker 이미지 빌드용): chatbot-models.lock 의 revision/SHA256 이 모두 고정되어 있어야 하고,
-#          내려받은 파일의 SHA256 이 다르면 실패한다. 고정되지 않은(PENDING) 항목이 있으면 실패한다.
-# resolve (평가/고정 작업용): PENDING 인 revision 은 저장소의 현재 커밋으로 풀고, PENDING 인 SHA256 은 계산해서
-#          "고정할 값"으로 출력한다. 이미 고정된 SHA256 이 다르면 여전히 실패한다.
-#
-# 결과: <out>/model.onnx, <out>/tokenizer.json, <out>/model.properties(접두어, 최대 토큰 등)
-# 환경변수: CHATBOT_MODEL_BASE_URL(기본 https://huggingface.co, 테스트에서는 file:// 로 바꾼다)
 set -euo pipefail
 
 LOCK="chatbot-models.lock"

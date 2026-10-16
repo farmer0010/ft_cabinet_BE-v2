@@ -19,7 +19,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** 질문이 "내 정보" 질문처럼 보이면 칩만 제안하고(데이터 없음), 그렇지 않으면 기존 FAQ 동작이 그대로인지 본다. */
 class ChatbotPersonalRoutingTest {
 
     private static final ChatbotSettings SETTINGS =
@@ -45,7 +44,6 @@ class ChatbotPersonalRoutingTest {
     @BeforeEach
     void setUp() {
         FakeFaqRepository repository = new FakeFaqRepository();
-        // 차원 6: 0~2 는 FAQ 축, 3~4 는 개인화 인텐트 축, 5 는 "아무와도 비슷하지 않음"
         embedding = new FakeEmbedding();
         embedding.dimension = 6;
         manager = new FaqIndexManager(repository, embedding);
@@ -96,7 +94,6 @@ class ChatbotPersonalRoutingTest {
     @Test
     @DisplayName("FAQ 가 더 가까우면 인텐트가 기준을 넘어도 칩을 붙이지 않는다")
     void faqCloserThanIntent() {
-        // 인텐트와 0.8 쯤 비슷하지만 FAQ(대여 방법)와는 거의 같다
         embedding.on("대여 만료일 관련", 0.9, 0, 0, 0.44, 0);
 
         ChatbotAnswer answer = withRouter.ask("대여 만료일 관련");
@@ -108,7 +105,6 @@ class ChatbotPersonalRoutingTest {
     @Test
     @DisplayName("인텐트와의 유사도가 후보 하한(suggest-threshold) 미만이면 칩을 붙이지 않는다")
     void belowThreshold() {
-        // 어떤 인텐트와도 약 0.3(후보 하한 0.60 미만)
         embedding.on("애매한 말", 0, 0, 0, 0.3, 0.3, 0.9);
 
         ChatbotAnswer answer = withRouter.ask("애매한 말");

@@ -86,7 +86,6 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      # 이 스택의 Redis 는 비밀번호가 없는 로컬/데모용이다. 운영과 공유하거나 외부에 공개하지 말 것.
       - REDIS_ALLOW_INSECURE=true
       - FT_CLIENT_ID=${FT_CLIENT_ID}
       - FT_CLIENT_SECRET=${FT_CLIENT_SECRET}
