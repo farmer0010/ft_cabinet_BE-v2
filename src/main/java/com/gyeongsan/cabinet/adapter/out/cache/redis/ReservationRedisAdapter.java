@@ -2,7 +2,10 @@ package com.gyeongsan.cabinet.adapter.out.cache.redis;
 
 import com.gyeongsan.cabinet.domain.lent.model.ReservationOutcome;
 import com.gyeongsan.cabinet.domain.lent.port.out.ReservationPort;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
@@ -108,6 +111,37 @@ public class ReservationRedisAdapter implements ReservationPort {
     public Optional<Long> getReservedUserId(Integer visibleNum) {
         String value = redisTemplate.opsForValue().get(CABINET_KEY_PREFIX + visibleNum);
         return value != null ? Optional.of(Long.valueOf(value)) : Optional.empty();
+    }
+
+    @Override
+    public Map<Integer, Long> getReservedUserIds(Collection<Integer> visibleNums) {
+        if (visibleNums == null || visibleNums.isEmpty()) {
+            return Map.of();
+        }
+        // MGET 은 키 순서대로 값을 돌려주므로 입력 순서를 고정한 목록으로 짝을 맞춘다.
+        List<Integer> nums = List.copyOf(visibleNums);
+        List<String> values =
+                redisTemplate.opsForValue().multiGet(nums.stream().map(this::cabinetKey).toList());
+        Map<Integer, Long> reserved = new HashMap<>();
+        if (values == null) {
+            return reserved;
+        }
+        for (int i = 0; i < nums.size() && i < values.size(); i++) {
+            if (values.get(i) != null) {
+                reserved.put(nums.get(i), Long.valueOf(values.get(i)));
+            }
+        }
+        return reserved;
+    }
+
+    @Override
+    public Optional<Long> getCabinetReservationTtlSeconds(Integer visibleNum) {
+        Long ttl = redisTemplate.getExpire(cabinetKey(visibleNum), TimeUnit.SECONDS);
+        return ttl != null && ttl >= 0 ? Optional.of(ttl) : Optional.empty();
+    }
+
+    private String cabinetKey(Integer visibleNum) {
+        return CABINET_KEY_PREFIX + visibleNum;
     }
 
     @Override

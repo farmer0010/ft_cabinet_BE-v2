@@ -58,6 +58,27 @@ class ReservationRedisAdapterTest {
     }
 
     @Test
+    @DisplayName("여러 사물함의 예약자를 한 번에 읽고, 예약이 없는 사물함은 맵에서 빠진다")
+    void getReservedUserIds_readsManyAtOnce() {
+        adapter.reserveReplacing(101, 7L, 15);
+        adapter.reserveReplacing(103, 8L, 15);
+
+        assertThat(adapter.getReservedUserIds(List.of(101, 102, 103)))
+                .containsOnly(java.util.Map.entry(101, 7L), java.util.Map.entry(103, 8L));
+        assertThat(adapter.getReservedUserIds(List.of(102))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("사물함 예약의 남은 시간은 초 단위로 읽고, 예약이 없으면 비어 있다")
+    void getCabinetReservationTtlSeconds_readsRealTtl() {
+        adapter.reserveReplacing(101, 7L, 15);
+
+        assertThat(adapter.getCabinetReservationTtlSeconds(101).orElseThrow())
+                .isBetween(890L, 900L);
+        assertThat(adapter.getCabinetReservationTtlSeconds(102)).isEmpty();
+    }
+
+    @Test
     @DisplayName("새 예약은 두 키를 함께 만들고 15분 TTL 을 둔다")
     void reserveReplacing_new() {
         ReservationOutcome outcome = adapter.reserveReplacing(101, 7L, 15);

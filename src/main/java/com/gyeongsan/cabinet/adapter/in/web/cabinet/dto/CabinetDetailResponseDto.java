@@ -28,5 +28,9 @@ public class CabinetDetailResponseDto {
     private String previousUserName;
     private LocalDateTime previousEndedAt;
 
+    private Boolean isReserved;
     private Boolean isReservedByMe;
+
+    /** 예약이 풀리기까지 남은 초. 예약이 없으면 null. 예약자가 누구인지는 어디에도 싣지 않는다. */
+    private Long reservationRemainingSeconds;
 }

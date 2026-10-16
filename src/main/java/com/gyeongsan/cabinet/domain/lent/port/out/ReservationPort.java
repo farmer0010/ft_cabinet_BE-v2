@@ -1,6 +1,8 @@
 package com.gyeongsan.cabinet.domain.lent.port.out;
 
 import com.gyeongsan.cabinet.domain.lent.model.ReservationOutcome;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 
 public interface ReservationPort {
@@ -12,6 +14,12 @@ public interface ReservationPort {
     ReservationOutcome reserveReplacing(Integer visibleNum, Long userId, long ttlMinutes);
 
     Optional<Long> getReservedUserId(Integer visibleNum);
+
+    /** 여러 사물함의 예약자를 한 번의 조회로 읽는다. 예약이 있는 사물함만 담기고, 입력이 비어 있으면 조회하지 않는다. */
+    Map<Integer, Long> getReservedUserIds(Collection<Integer> visibleNums);
+
+    /** 사물함 예약의 남은 시간(초). 예약이 없거나 만료 시각이 없는 비정상 키면 비어 있다. */
+    Optional<Long> getCabinetReservationTtlSeconds(Integer visibleNum);
 
     Optional<Integer> getUserReservation(Long userId);
 
